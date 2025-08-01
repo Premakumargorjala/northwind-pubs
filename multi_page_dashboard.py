@@ -404,6 +404,7 @@ def orders_overview_page(data):
         if 'OrderDate' in filtered_orders.columns:
             st.subheader("Orders Over Time")
             orders_by_date = filtered_orders.groupby(filtered_orders['OrderDate'].dt.date).size().reset_index(name='count')
+            orders_by_date['OrderDate'] = pd.to_datetime(orders_by_date['OrderDate']).dt.date
             fig_time = px.line(
                 x=orders_by_date['OrderDate'],
                 y=orders_by_date['count'],
@@ -628,6 +629,7 @@ def sales_products_page(data):
     if 'OrderDate' in sales_df.columns:
         st.subheader("Revenue Over Time")
         daily_revenue = sales_df.groupby(sales_df['OrderDate'].dt.date)['Revenue'].sum().reset_index()
+        daily_revenue['OrderDate'] = pd.to_datetime(daily_revenue['OrderDate']).dt.date
         fig_revenue = px.line(
             x=daily_revenue['OrderDate'],
             y=daily_revenue['Revenue'],
@@ -1503,7 +1505,7 @@ def show_charts_for_filter(data, active_filter, filter_value):
                 if 'OrderDate' in customer_orders.columns:
                     customer_orders['OrderDate'] = pd.to_datetime(customer_orders['OrderDate'], errors='coerce')
                     orders_by_date = customer_orders.groupby(customer_orders['OrderDate'].dt.date).size().reset_index(name='Orders')
-                    orders_by_date['OrderDate'] = pd.to_datetime(orders_by_date['OrderDate'])
+                    orders_by_date['OrderDate'] = pd.to_datetime(orders_by_date['OrderDate']).dt.date
                     
                     fig = px.line(
                         orders_by_date, 
@@ -1656,7 +1658,7 @@ def show_charts_for_filter(data, active_filter, filter_value):
                 if 'OrderDate' in employee_orders.columns:
                     employee_orders['OrderDate'] = pd.to_datetime(employee_orders['OrderDate'], errors='coerce')
                     performance_by_date = employee_orders.groupby(employee_orders['OrderDate'].dt.date).size().reset_index(name='Orders')
-                    performance_by_date['OrderDate'] = pd.to_datetime(performance_by_date['OrderDate'])
+                    performance_by_date['OrderDate'] = pd.to_datetime(performance_by_date['OrderDate']).dt.date
                     
                     fig = px.line(
                         performance_by_date,
@@ -1723,7 +1725,7 @@ def show_charts_for_filter(data, active_filter, filter_value):
                     if 'OrderDate' in product_with_dates.columns:
                         product_with_dates['OrderDate'] = pd.to_datetime(product_with_dates['OrderDate'], errors='coerce')
                         quantity_by_date = product_with_dates.groupby(product_with_dates['OrderDate'].dt.date)['Quantity'].sum().reset_index()
-                        quantity_by_date['OrderDate'] = pd.to_datetime(quantity_by_date['OrderDate'])
+                        quantity_by_date['OrderDate'] = pd.to_datetime(quantity_by_date['OrderDate']).dt.date
                         
                         fig = px.line(
                             quantity_by_date,
@@ -2023,7 +2025,7 @@ def show_charts_for_filter(data, active_filter, filter_value):
                 with col1:
                     # Orders over time in date range
                     orders_by_date = date_filtered_orders.groupby(date_filtered_orders['OrderDate'].dt.date).size().reset_index(name='Orders')
-                    orders_by_date['OrderDate'] = pd.to_datetime(orders_by_date['OrderDate'])
+                    orders_by_date['OrderDate'] = pd.to_datetime(orders_by_date['OrderDate']).dt.date
                     
                     fig = px.line(
                         orders_by_date,
@@ -2100,7 +2102,7 @@ def show_charts_for_filter(data, active_filter, filter_value):
                                 date_filtered_orders[['OrderID', 'OrderDate']], on='OrderID', how='left'
                             )
                             daily_revenue = daily_revenue.groupby(daily_revenue['OrderDate'].dt.date)['Revenue'].sum().reset_index()
-                            daily_revenue['OrderDate'] = pd.to_datetime(daily_revenue['OrderDate'])
+                            daily_revenue['OrderDate'] = pd.to_datetime(daily_revenue['OrderDate']).dt.date
                             
                             fig = px.line(
                                 daily_revenue,
