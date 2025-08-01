@@ -921,67 +921,328 @@ def data_relationships_page(data):
         elif active_filter == 'DateRange':
             display_name = f"{date_range[0]} to {date_range[1]}"
         
-        st.header(f"📊 Detailed Analysis for {active_filter}: {display_name}")
+        st.header(f"📊 Comprehensive Data Analysis for {active_filter}: {display_name}")
         
-        # Create tabs for organized display
-        tab1, tab2, tab3, tab4 = st.tabs(["📋 Related Data", "📈 Analytics", "📊 Charts", "💾 Export"])
+        # Create comprehensive dataset based on your SQL query
+        comprehensive_data = create_comprehensive_dataset(data)
         
-        with tab1:
-            st.subheader("🔗 Related Information")
+        if not comprehensive_data.empty:
+            # Apply filters to comprehensive data
+            filtered_comprehensive = apply_filters_to_comprehensive_data(comprehensive_data, active_filter, filter_value)
             
-            if active_filter == 'CustomerID':
-                show_customer_detailed_relationships(data, filter_value)
-            elif active_filter == 'OrderID':
-                show_order_detailed_relationships(data, filter_value)
-            elif active_filter == 'EmployeeID':
-                show_employee_detailed_relationships(data, filter_value)
-            elif active_filter == 'ProductID':
-                show_product_detailed_relationships(data, filter_value)
-            elif active_filter == 'CategoryID':
-                show_category_detailed_relationships(data, filter_value)
-            elif active_filter == 'DateRange':
-                show_date_range_relationships(data, filter_value)
-        
-        with tab2:
-            st.subheader("📈 Key Metrics & Analytics")
-            show_analytics_for_filter(data, active_filter, filter_value)
-        
-        with tab3:
-            st.subheader("📊 Interactive Charts")
-            show_charts_for_filter(data, active_filter, filter_value)
-        
-        with tab4:
-            st.subheader("💾 Export Data")
-            show_export_options(data, active_filter, filter_value)
+            if not filtered_comprehensive.empty:
+                # Create tabs for organized display
+                tab1, tab2, tab3, tab4 = st.tabs(["📋 All Related Data", "📈 Analytics", "📊 Charts", "💾 Export"])
+                
+                with tab1:
+                    st.subheader("🔗 Complete Related Data View")
+                    st.info(f"Showing all related data for {active_filter}: {display_name}")
+                    
+                    # Display comprehensive data table
+                    st.subheader("📊 Complete Data Table")
+                    st.dataframe(filtered_comprehensive, use_container_width=True)
+                    
+                    # Show data summary
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Total Records", len(filtered_comprehensive))
+                    with col2:
+                        st.metric("Total Revenue", f"${filtered_comprehensive['Revenue'].sum():,.2f}" if 'Revenue' in filtered_comprehensive.columns else "N/A")
+                    with col3:
+                        st.metric("Total Quantity", f"{filtered_comprehensive['Quantity'].sum():,}" if 'Quantity' in filtered_comprehensive.columns else "N/A")
+                    
+                    # Show detailed breakdowns
+                    st.subheader("📋 Data Breakdowns")
+                    
+                    # Orders breakdown
+                    if 'OrderID' in filtered_comprehensive.columns:
+                        with st.expander("📦 Orders Information"):
+                            orders_summary = filtered_comprehensive[['OrderID', 'OrderDate', 'ShippedDate', 'ShipName', 'ShipCountry']].drop_duplicates()
+                            st.dataframe(orders_summary, use_container_width=True)
+                    
+                    # Products breakdown
+                    if 'ProductName' in filtered_comprehensive.columns:
+                        with st.expander("📦 Products Information"):
+                            products_summary = filtered_comprehensive[['ProductID', 'ProductName', 'CategoryName', 'UnitPrice']].drop_duplicates()
+                            st.dataframe(products_summary, use_container_width=True)
+                    
+                    # Customers breakdown
+                    if 'CustomerCompany' in filtered_comprehensive.columns:
+                        with st.expander("👤 Customers Information"):
+                            customers_summary = filtered_comprehensive[['CustomerID', 'CustomerCompany']].drop_duplicates()
+                            st.dataframe(customers_summary, use_container_width=True)
+                    
+                    # Employees breakdown
+                    if 'FirstName' in filtered_comprehensive.columns:
+                        with st.expander("👨‍💼 Employees Information"):
+                            employees_summary = filtered_comprehensive[['EmployeeID', 'FirstName', 'LastName']].drop_duplicates()
+                            st.dataframe(employees_summary, use_container_width=True)
+                
+                with tab2:
+                    st.subheader("📈 Key Metrics & Analytics")
+                    show_comprehensive_analytics(filtered_comprehensive, active_filter, filter_value)
+                
+                with tab3:
+                    st.subheader("📊 Interactive Charts")
+                    show_comprehensive_charts(filtered_comprehensive, active_filter, filter_value)
+                
+                with tab4:
+                    st.subheader("💾 Export Data")
+                    show_comprehensive_export(filtered_comprehensive, active_filter, filter_value)
+            else:
+                st.warning(f"No data found for {active_filter}: {display_name}")
+        else:
+            st.error("Could not create comprehensive dataset. Please check your data.")
     
     else:
-        # Show overview when no filter is selected
-        st.header("📋 Data Overview")
-        st.info("👈 Select a filter from the sidebar to explore detailed relationships")
+        # Show comprehensive overview when no filter is selected
+        st.header("📋 Complete Data Overview")
+        st.info("👈 Select a filter from the sidebar to explore comprehensive data relationships")
         
-        # Show summary statistics
-        col1, col2, col3 = st.columns(3)
+        # Create and display comprehensive dataset
+        comprehensive_data = create_comprehensive_dataset(data)
         
-        with col1:
-            st.metric("Total Orders", len(data['orders']) if not data['orders'].empty else 0)
-            st.metric("Total Customers", len(data['customers']) if not data['customers'].empty else 0)
+        if not comprehensive_data.empty:
+            st.subheader("📊 Complete Dataset (All Tables Joined)")
+            st.dataframe(comprehensive_data, use_container_width=True)
+            
+            # Show summary statistics
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("Total Records", len(comprehensive_data))
+                st.metric("Total Orders", comprehensive_data['OrderID'].nunique() if 'OrderID' in comprehensive_data.columns else 0)
+            
+            with col2:
+                st.metric("Total Products", comprehensive_data['ProductID'].nunique() if 'ProductID' in comprehensive_data.columns else 0)
+                st.metric("Total Customers", comprehensive_data['CustomerID'].nunique() if 'CustomerID' in comprehensive_data.columns else 0)
+            
+            with col3:
+                st.metric("Total Revenue", f"${comprehensive_data['Revenue'].sum():,.2f}" if 'Revenue' in comprehensive_data.columns else "N/A")
+                st.metric("Total Quantity", f"{comprehensive_data['Quantity'].sum():,}" if 'Quantity' in comprehensive_data.columns else "N/A")
+        else:
+            st.error("Could not create comprehensive dataset. Please check your data.")
+
+def apply_filters_to_comprehensive_data(comprehensive_data, active_filter, filter_value):
+    """Apply filters to comprehensive dataset"""
+    if comprehensive_data.empty:
+        return comprehensive_data
+    
+    if active_filter == 'CustomerID':
+        return comprehensive_data[comprehensive_data['CustomerID'] == filter_value]
+    elif active_filter == 'OrderID':
+        return comprehensive_data[comprehensive_data['OrderID'] == filter_value]
+    elif active_filter == 'EmployeeID':
+        return comprehensive_data[comprehensive_data['EmployeeID'] == filter_value]
+    elif active_filter == 'ProductID':
+        return comprehensive_data[comprehensive_data['ProductID'] == filter_value]
+    elif active_filter == 'CategoryID':
+        return comprehensive_data[comprehensive_data['CategoryID'] == filter_value]
+    elif active_filter == 'DateRange':
+        start_date, end_date = filter_value
+        if 'OrderDate' in comprehensive_data.columns:
+            comprehensive_data['OrderDate'] = pd.to_datetime(comprehensive_data['OrderDate'], errors='coerce')
+            return comprehensive_data[
+                (comprehensive_data['OrderDate'].dt.date >= start_date) &
+                (comprehensive_data['OrderDate'].dt.date <= end_date)
+            ]
+    
+    return comprehensive_data
+
+def show_comprehensive_analytics(comprehensive_data, active_filter, filter_value):
+    """Show comprehensive analytics for the filtered data"""
+    if comprehensive_data.empty:
+        st.warning("No data available for analytics")
+        return
+    
+    # Key metrics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        total_records = len(comprehensive_data)
+        st.metric("Total Records", total_records)
+    
+    with col2:
+        if 'Revenue' in comprehensive_data.columns:
+            total_revenue = comprehensive_data['Revenue'].sum()
+            st.metric("Total Revenue", f"${total_revenue:,.2f}")
+        else:
+            st.metric("Total Revenue", "N/A")
+    
+    with col3:
+        if 'Quantity' in comprehensive_data.columns:
+            total_quantity = comprehensive_data['Quantity'].sum()
+            st.metric("Total Quantity", f"{total_quantity:,}")
+        else:
+            st.metric("Total Quantity", "N/A")
+    
+    with col4:
+        if 'OrderID' in comprehensive_data.columns:
+            unique_orders = comprehensive_data['OrderID'].nunique()
+            st.metric("Unique Orders", unique_orders)
+        else:
+            st.metric("Unique Orders", "N/A")
+    
+    # Additional analytics
+    st.subheader("📊 Detailed Analytics")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if 'CategoryName' in comprehensive_data.columns:
+            st.subheader("📦 Top Categories")
+            category_summary = comprehensive_data.groupby('CategoryName').agg({
+                'Quantity': 'sum',
+                'Revenue': 'sum'
+            }).sort_values('Revenue', ascending=False).head(10)
+            st.dataframe(category_summary, use_container_width=True)
+    
+    with col2:
+        if 'CustomerCompany' in comprehensive_data.columns:
+            st.subheader("👤 Top Customers")
+            customer_summary = comprehensive_data.groupby('CustomerCompany').agg({
+                'Quantity': 'sum',
+                'Revenue': 'sum'
+            }).sort_values('Revenue', ascending=False).head(10)
+            st.dataframe(customer_summary, use_container_width=True)
+
+def show_comprehensive_charts(comprehensive_data, active_filter, filter_value):
+    """Show comprehensive charts for the filtered data"""
+    if comprehensive_data.empty:
+        st.warning("No data available for charts")
+        return
+    
+    # Custom color schemes
+    colors = px.colors.qualitative.Set3
+    
+    st.subheader("📈 Comprehensive Data Visualizations")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Revenue by category
+        if 'CategoryName' in comprehensive_data.columns and 'Revenue' in comprehensive_data.columns:
+            category_revenue = comprehensive_data.groupby('CategoryName')['Revenue'].sum().sort_values(ascending=False)
+            fig = px.bar(
+                x=category_revenue.index,
+                y=category_revenue.values,
+                title="💰 Revenue by Category",
+                labels={'x': 'Category', 'y': 'Revenue ($)'},
+                color=category_revenue.values,
+                color_continuous_scale='Greens'
+            )
+            fig.update_layout(
+                plot_bgcolor='white',
+                paper_bgcolor='white',
+                title_font_size=16,
+                title_font_color='#2E86AB',
+                xaxis_tickangle=-45
+            )
+            st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        # Quantity by product
+        if 'ProductName' in comprehensive_data.columns and 'Quantity' in comprehensive_data.columns:
+            product_quantity = comprehensive_data.groupby('ProductName')['Quantity'].sum().sort_values(ascending=False).head(10)
+            fig = px.bar(
+                x=product_quantity.index,
+                y=product_quantity.values,
+                title="📦 Top 10 Products by Quantity",
+                labels={'x': 'Product', 'y': 'Quantity'},
+                color=product_quantity.values,
+                color_continuous_scale='Blues'
+            )
+            fig.update_layout(
+                plot_bgcolor='white',
+                paper_bgcolor='white',
+                title_font_size=16,
+                title_font_color='#2E86AB',
+                xaxis_tickangle=-45
+            )
+            st.plotly_chart(fig, use_container_width=True)
+    
+    col3, col4 = st.columns(2)
+    
+    with col3:
+        # Orders over time
+        if 'OrderDate' in comprehensive_data.columns:
+            comprehensive_data['OrderDate'] = pd.to_datetime(comprehensive_data['OrderDate'], errors='coerce')
+            orders_by_date = comprehensive_data.groupby(comprehensive_data['OrderDate'].dt.date).size().reset_index(name='Orders')
+            orders_by_date['OrderDate'] = pd.to_datetime(orders_by_date['OrderDate']).dt.date
+            
+            fig = px.line(
+                orders_by_date,
+                x='OrderDate',
+                y='Orders',
+                title="📅 Orders Over Time",
+                labels={'Orders': 'Number of Orders', 'OrderDate': 'Date'},
+                line_shape='spline',
+                markers=True
+            )
+            fig.update_layout(
+                plot_bgcolor='white',
+                paper_bgcolor='white',
+                title_font_size=16,
+                title_font_color='#2E86AB'
+            )
+            fig.update_traces(line_color='#2E86AB', line_width=3, marker_size=8)
+            st.plotly_chart(fig, use_container_width=True)
+    
+    with col4:
+        # Revenue over time
+        if 'OrderDate' in comprehensive_data.columns and 'Revenue' in comprehensive_data.columns:
+            revenue_by_date = comprehensive_data.groupby(comprehensive_data['OrderDate'].dt.date)['Revenue'].sum().reset_index()
+            revenue_by_date['OrderDate'] = pd.to_datetime(revenue_by_date['OrderDate']).dt.date
+            
+            fig = px.line(
+                revenue_by_date,
+                x='OrderDate',
+                y='Revenue',
+                title="💰 Revenue Over Time",
+                labels={'Revenue': 'Revenue ($)', 'OrderDate': 'Date'},
+                line_shape='spline',
+                markers=True
+            )
+            fig.update_layout(
+                plot_bgcolor='white',
+                paper_bgcolor='white',
+                title_font_size=16,
+                title_font_color='#2E86AB'
+            )
+            fig.update_traces(line_color='#FF6B6B', line_width=3, marker_size=8)
+            st.plotly_chart(fig, use_container_width=True)
+
+def show_comprehensive_export(comprehensive_data, active_filter, filter_value):
+    """Show export options for comprehensive data"""
+    if comprehensive_data.empty:
+        st.warning("No data available for export")
+        return
+    
+    st.subheader("📊 Export Comprehensive Data")
+    
+    # Export full comprehensive data
+    csv_data = comprehensive_data.to_csv(index=False)
+    st.download_button(
+        label="📥 Download Complete Data (CSV)",
+        data=csv_data,
+        file_name=f"comprehensive_data_{active_filter}_{filter_value}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        mime="text/csv"
+    )
+    
+    # Export summary data
+    if 'CategoryName' in comprehensive_data.columns and 'Revenue' in comprehensive_data.columns:
+        category_summary = comprehensive_data.groupby('CategoryName').agg({
+            'Quantity': 'sum',
+            'Revenue': 'sum'
+        }).reset_index()
         
-        with col2:
-            st.metric("Total Products", len(data['products']) if not data['products'].empty else 0)
-            st.metric("Total Employees", len(data['employees']) if not data['employees'].empty else 0)
-        
-        with col3:
-            st.metric("Total Categories", len(data['categories']) if not data['categories'].empty else 0)
-            st.metric("Order Details", len(data['orderdetails']) if not data['orderdetails'].empty else 0)
-        
-        # Show sample data from each table
-        st.subheader("📋 Sample Data from Each Table")
-        
-        tables = ['customers', 'orders', 'products', 'categories', 'employees', 'orderdetails']
-        for table in tables:
-            if not data[table].empty:
-                with st.expander(f"📊 {table.title()} (First 5 rows)"):
-                    st.dataframe(data[table].head(), use_container_width=True)
+        csv_summary = category_summary.to_csv(index=False)
+        st.download_button(
+            label="📥 Download Category Summary (CSV)",
+            data=csv_summary,
+            file_name=f"category_summary_{active_filter}_{filter_value}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
 
 def create_comprehensive_dataset(data):
     """Create comprehensive dataset using your exact SQL query logic"""
@@ -1048,6 +1309,10 @@ def create_comprehensive_dataset(data):
         # Rename CompanyName to CustomerCompany to match your query
         if 'CompanyName' in comprehensive.columns:
             comprehensive = comprehensive.rename(columns={'CompanyName': 'CustomerCompany'})
+        
+        # Calculate Revenue
+        if 'UnitPrice' in comprehensive.columns and 'Quantity' in comprehensive.columns:
+            comprehensive['Revenue'] = comprehensive['UnitPrice'] * comprehensive['Quantity']
         
         return comprehensive
         
