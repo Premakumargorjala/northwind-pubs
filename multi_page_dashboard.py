@@ -157,131 +157,6 @@ def load_all_data():
         st.error(f"Error connecting to database: {str(e)}")
         return None
 
-@st.cache_data(ttl=3600)  # Cache for 1 hour
-def load_relationship_data():
-    """Load data with proper table relationships for dropdowns"""
-    try:
-        # SQL Server connection string
-        CONN_STR = (
-            r'DRIVER={SQL Server};'
-            r'SERVER=localhost\SQLEXPRESS;'
-            r'DATABASE=practicedatabase;'
-            r'Trusted_Connection=yes;'
-        )
-        
-        # Create SQLAlchemy engine
-        engine = create_engine(f'mssql+pyodbc:///?odbc_connect={CONN_STR}')
-        
-        relationship_data = {}
-        
-        # Query 1: Orders with Customer and Employee information
-        try:
-            orders_query = """
-            SELECT 
-                o.OrderID,
-                o.OrderDate,
-                o.ShipName,
-                c.CompanyName AS CustomerName,
-                c.CustomerID,
-                e.FirstName + ' ' + e.LastName AS EmployeeName,
-                e.EmployeeID
-            FROM Orders o
-            LEFT JOIN Customers c ON o.CustomerID = c.CustomerID
-            LEFT JOIN Employees e ON o.EmployeeID = e.EmployeeID
-            ORDER BY o.OrderDate DESC
-            """
-            relationship_data['orders_with_details'] = pd.read_sql(orders_query, engine)
-        except Exception as e:
-            st.warning(f"Could not load Orders with details: {str(e)}")
-            relationship_data['orders_with_details'] = pd.DataFrame()
-        
-        # Query 2: Products with Category information
-        try:
-            products_query = """
-            SELECT 
-                p.ProductID,
-                p.ProductName,
-                p.UnitPrice,
-                p.UnitsInStock,
-                c.CategoryName,
-                c.CategoryID
-            FROM Products p
-            LEFT JOIN Categories c ON p.CategoryID = c.CategoryID
-            ORDER BY p.ProductName
-            """
-            relationship_data['products_with_categories'] = pd.read_sql(products_query, engine)
-        except Exception as e:
-            st.warning(f"Could not load Products with categories: {str(e)}")
-            relationship_data['products_with_categories'] = pd.DataFrame()
-        
-        # Query 3: Order Details with Product and Order information
-        try:
-            orderdetails_query = """
-            SELECT 
-                od.OrderID,
-                od.ProductID,
-                od.UnitPrice,
-                od.Quantity,
-                od.Discount,
-                p.ProductName,
-                o.OrderDate,
-                c.CompanyName AS CustomerName
-            FROM [Order Details] od
-            LEFT JOIN Products p ON od.ProductID = p.ProductID
-            LEFT JOIN Orders o ON od.OrderID = o.OrderID
-            LEFT JOIN Customers c ON o.CustomerID = c.CustomerID
-            ORDER BY o.OrderDate DESC
-            """
-            relationship_data['orderdetails_with_details'] = pd.read_sql(orderdetails_query, engine)
-        except Exception as e:
-            st.warning(f"Could not load Order Details with details: {str(e)}")
-            relationship_data['orderdetails_with_details'] = pd.DataFrame()
-        
-        # Query 4: Employees with their order count
-        try:
-            employees_query = """
-            SELECT 
-                e.EmployeeID,
-                e.FirstName,
-                e.LastName,
-                e.Title,
-                e.City,
-                COUNT(o.OrderID) AS OrderCount
-            FROM Employees e
-            LEFT JOIN Orders o ON e.EmployeeID = o.EmployeeID
-            GROUP BY e.EmployeeID, e.FirstName, e.LastName, e.Title, e.City
-            ORDER BY OrderCount DESC
-            """
-            relationship_data['employees_with_orders'] = pd.read_sql(employees_query, engine)
-        except Exception as e:
-            st.warning(f"Could not load Employees with orders: {str(e)}")
-            relationship_data['employees_with_orders'] = pd.DataFrame()
-        
-        # Query 5: Categories with product count and revenue
-        try:
-            categories_query = """
-            SELECT 
-                c.CategoryID,
-                c.CategoryName,
-                COUNT(p.ProductID) AS ProductCount,
-                SUM(od.UnitPrice * od.Quantity) AS TotalRevenue
-            FROM Categories c
-            LEFT JOIN Products p ON c.CategoryID = p.CategoryID
-            LEFT JOIN [Order Details] od ON p.ProductID = od.ProductID
-            GROUP BY c.CategoryID, c.CategoryName
-            ORDER BY TotalRevenue DESC
-            """
-            relationship_data['categories_with_stats'] = pd.read_sql(categories_query, engine)
-        except Exception as e:
-            st.warning(f"Could not load Categories with stats: {str(e)}")
-            relationship_data['categories_with_stats'] = pd.DataFrame()
-        
-        return relationship_data
-        
-    except Exception as e:
-        st.error(f"Error loading relationship data: {str(e)}")
-        return None
-
 def customer_insights_page(data):
     """Customer Insights Dashboard"""
     st.markdown('<h1 class="main-header">👥 Customer Insights</h1>', unsafe_allow_html=True)
@@ -942,59 +817,41 @@ def data_relationships_page(data):
     </div>
     """, unsafe_allow_html=True)
     
-    # Load relationship data with proper joins
-    relationship_data = load_relationship_data()
-    
     # Sidebar Filters
     st.sidebar.header("🔍 Sidebar Filters")
     
-    # Get unique values for filters using proper table relationships
-    if not relationship_data['orders_with_details'].empty:
-        order_options = ['All'] + [
-            f"Order #{row['OrderID']} - {row['CustomerName']} ({row['OrderDate'].strftime('%Y-%m-%d') if pd.notna(row['OrderDate']) else 'N/A'})" 
-            for _, row in relationship_data['orders_with_details'].iterrows()
-        ]
-        order_id_map = {option: row['OrderID'] for option, row in zip(order_options[1:], relationship_data['orders_with_details'].iterrows())}
+    # Get unique values for filters with names instead of IDs
+    if not data['orders'].empty:
+        order_options = ['All'] + [f"Order #{order_id}" for order_id in sorted(data['orders']['OrderID'].unique())]
+        order_id_map = {f"Order #{order_id}": order_id for order_id in data['orders']['OrderID'].unique()}
     else:
         order_options = ['All']
         order_id_map = {}
     
     if not data['customers'].empty:
-        customer_options = ['All'] + [
-            f"{row['CompanyName']} - {row['City']}, {row['Country']} ({row['CustomerID']})" 
-            for _, row in data['customers'].iterrows()
-        ]
-        customer_id_map = {option: row['CustomerID'] for option, row in zip(customer_options[1:], data['customers'].iterrows())}
+        customer_options = ['All'] + [f"{row['CompanyName']} ({row['CustomerID']})" for _, row in data['customers'].iterrows()]
+        customer_id_map = {f"{row['CompanyName']} ({row['CustomerID']})": row['CustomerID'] for _, row in data['customers'].iterrows()}
     else:
         customer_options = ['All']
         customer_id_map = {}
     
-    if not relationship_data['employees_with_orders'].empty:
-        employee_options = ['All'] + [
-            f"{row['FirstName']} {row['LastName']} - {row['Title']} ({row['OrderCount']} orders)" 
-            for _, row in relationship_data['employees_with_orders'].iterrows()
-        ]
-        employee_id_map = {option: row['EmployeeID'] for option, row in zip(employee_options[1:], relationship_data['employees_with_orders'].iterrows())}
+    if not data['employees'].empty:
+        employee_options = ['All'] + [f"{row['FirstName']} {row['LastName']} ({row['EmployeeID']})" for _, row in data['employees'].iterrows()]
+        employee_id_map = {f"{row['FirstName']} {row['LastName']} ({row['EmployeeID']})": row['EmployeeID'] for _, row in data['employees'].iterrows()}
     else:
         employee_options = ['All']
         employee_id_map = {}
     
-    if not relationship_data['products_with_categories'].empty:
-        product_options = ['All'] + [
-            f"{row['ProductName']} - {row['CategoryName']} (${row['UnitPrice']:.2f})" 
-            for _, row in relationship_data['products_with_categories'].iterrows()
-        ]
-        product_id_map = {option: row['ProductID'] for option, row in zip(product_options[1:], relationship_data['products_with_categories'].iterrows())}
+    if not data['products'].empty:
+        product_options = ['All'] + [f"{row['ProductName']} ({row['ProductID']})" for _, row in data['products'].iterrows()]
+        product_id_map = {f"{row['ProductName']} ({row['ProductID']})": row['ProductID'] for _, row in data['products'].iterrows()}
     else:
         product_options = ['All']
         product_id_map = {}
     
-    if not relationship_data['categories_with_stats'].empty:
-        category_options = ['All'] + [
-            f"{row['CategoryName']} - {row['ProductCount']} products (${row['TotalRevenue']:.2f} revenue)" 
-            for _, row in relationship_data['categories_with_stats'].iterrows()
-        ]
-        category_id_map = {option: row['CategoryID'] for option, row in zip(category_options[1:], relationship_data['categories_with_stats'].iterrows())}
+    if not data['categories'].empty:
+        category_options = ['All'] + [f"{row['CategoryName']} ({row['CategoryID']})" for _, row in data['categories'].iterrows()]
+        category_id_map = {f"{row['CategoryName']} ({row['CategoryID']})": row['CategoryID'] for _, row in data['categories'].iterrows()}
     else:
         category_options = ['All']
         category_id_map = {}
@@ -1953,7 +1810,7 @@ def show_charts_for_filter(data, active_filter, filter_value):
                     title_font_size=16,
                     title_font_color='#2E86AB'
                 )
-                                        st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True)
     
     elif active_filter == 'OrderID':
         # Order charts
