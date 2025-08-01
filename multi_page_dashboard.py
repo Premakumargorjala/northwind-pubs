@@ -801,6 +801,232 @@ def employees_page(data):
         mime="text/csv"
     )
 
+def data_relationships_page(data):
+    """Data Relationships Page - Show related data across tables"""
+    st.markdown('<h1 class="main-header">🔗 Data Relationships Explorer</h1>', unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div style='background-color: #f0f8ff; padding: 1rem; border-radius: 0.5rem; margin-bottom: 2rem;'>
+        <h3>🔍 How to use this feature:</h3>
+        <ul>
+            <li>Select a table and choose a record to explore</li>
+            <li>View all related data from other tables</li>
+            <li>See the complete data story for any record</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Table selection
+    table_options = {
+        'Customers': {'data': data['customers'], 'key_col': 'CustomerID'},
+        'Orders': {'data': data['orders'], 'key_col': 'OrderID'},
+        'Products': {'data': data['products'], 'key_col': 'ProductID'},
+        'Categories': {'data': data['categories'], 'key_col': 'CategoryID'},
+        'Employees': {'data': data['employees'], 'key_col': 'EmployeeID'}
+    }
+    
+    selected_table = st.selectbox("Select a table to explore:", list(table_options.keys()))
+    
+    if selected_table:
+        table_info = table_options[selected_table]
+        df = table_info['data']
+        key_col = table_info['key_col']
+        
+        if df.empty:
+            st.warning(f"No data available for {selected_table} table")
+            return
+        
+        # Display the selected table
+        st.subheader(f"📋 {selected_table} Table")
+        st.write(f"**Total Records:** {len(df):,}")
+        
+        # Search and filter functionality
+        col1, col2 = st.columns(2)
+        with col1:
+            search_term = st.text_input(f"🔍 Search in {selected_table}:", key=f"search_rel_{selected_table}")
+        with col2:
+            if key_col in df.columns:
+                unique_keys = df[key_col].dropna().unique()
+                selected_key = st.selectbox(f"Select a {key_col}:", [''] + list(unique_keys), key=f"key_select_{selected_table}")
+        
+        # Filter data based on search and selection
+        display_df = df.copy()
+        if search_term:
+            search_mask = pd.DataFrame([display_df[col].astype(str).str.contains(search_term, case=False, na=False) 
+                                      for col in display_df.select_dtypes(include=['object']).columns]).any()
+            display_df = display_df[search_mask]
+        
+        if selected_key and selected_key != '':
+            display_df = display_df[display_df[key_col] == selected_key]
+        
+        # Display the filtered table
+        st.dataframe(
+            display_df,
+            use_container_width=True,
+            hide_index=True
+        )
+        
+        # Show related data when a specific record is selected
+        if selected_key and selected_key != '':
+            st.markdown("---")
+            st.subheader(f"🔗 Related Data for {key_col}: {selected_key}")
+            
+            # Show related data based on the selected table
+            if selected_table == 'Customers':
+                show_customer_relationships(data, selected_key)
+            elif selected_table == 'Orders':
+                show_order_relationships(data, selected_key)
+            elif selected_table == 'Products':
+                show_product_relationships(data, selected_key)
+            elif selected_table == 'Categories':
+                show_category_relationships(data, selected_key)
+            elif selected_table == 'Employees':
+                show_employee_relationships(data, selected_key)
+
+def show_customer_relationships(data, customer_id):
+    """Show all data related to a specific customer"""
+    st.markdown("### 📊 Customer Relationships")
+    
+    # Customer details
+    customer = data['customers'][data['customers']['CustomerID'] == customer_id]
+    if not customer.empty:
+        st.markdown("**Customer Information:**")
+        st.json(customer.iloc[0].to_dict())
+    
+    # Customer's orders
+    customer_orders = data['orders'][data['orders']['CustomerID'] == customer_id]
+    if not customer_orders.empty:
+        st.markdown(f"**Orders ({len(customer_orders)}):**")
+        st.dataframe(customer_orders, use_container_width=True, hide_index=True)
+        
+        # Order details for this customer
+        order_ids = customer_orders['OrderID'].tolist()
+        if order_ids and not data['orderdetails'].empty:
+            customer_order_details = data['orderdetails'][data['orderdetails']['OrderID'].isin(order_ids)]
+            if not customer_order_details.empty:
+                st.markdown(f"**Order Details ({len(customer_order_details)}):**")
+                st.dataframe(customer_order_details, use_container_width=True, hide_index=True)
+
+def show_order_relationships(data, order_id):
+    """Show all data related to a specific order"""
+    st.markdown("### 📊 Order Relationships")
+    
+    # Order details
+    order = data['orders'][data['orders']['OrderID'] == order_id]
+    if not order.empty:
+        st.markdown("**Order Information:**")
+        st.json(order.iloc[0].to_dict())
+    
+    # Customer who placed the order
+    if not order.empty and 'CustomerID' in order.columns:
+        customer_id = order.iloc[0]['CustomerID']
+        customer = data['customers'][data['customers']['CustomerID'] == customer_id]
+        if not customer.empty:
+            st.markdown("**Customer Information:**")
+            st.json(customer.iloc[0].to_dict())
+    
+    # Employee who handled the order
+    if not order.empty and 'EmployeeID' in order.columns:
+        employee_id = order.iloc[0]['EmployeeID']
+        employee = data['employees'][data['employees']['EmployeeID'] == employee_id]
+        if not employee.empty:
+            st.markdown("**Employee Information:**")
+            st.json(employee.iloc[0].to_dict())
+    
+    # Order details
+    order_details = data['orderdetails'][data['orderdetails']['OrderID'] == order_id]
+    if not order_details.empty:
+        st.markdown(f"**Order Details ({len(order_details)}):**")
+        st.dataframe(order_details, use_container_width=True, hide_index=True)
+        
+        # Product information for order details
+        product_ids = order_details['ProductID'].tolist()
+        if product_ids and not data['products'].empty:
+            products = data['products'][data['products']['ProductID'].isin(product_ids)]
+            if not products.empty:
+                st.markdown("**Products in this Order:**")
+                st.dataframe(products, use_container_width=True, hide_index=True)
+
+def show_product_relationships(data, product_id):
+    """Show all data related to a specific product"""
+    st.markdown("### 📊 Product Relationships")
+    
+    # Product details
+    product = data['products'][data['products']['ProductID'] == product_id]
+    if not product.empty:
+        st.markdown("**Product Information:**")
+        st.json(product.iloc[0].to_dict())
+    
+    # Category information
+    if not product.empty and 'CategoryID' in product.columns:
+        category_id = product.iloc[0]['CategoryID']
+        category = data['categories'][data['categories']['CategoryID'] == category_id]
+        if not category.empty:
+            st.markdown("**Category Information:**")
+            st.json(category.iloc[0].to_dict())
+    
+    # Order details for this product
+    product_order_details = data['orderdetails'][data['orderdetails']['ProductID'] == product_id]
+    if not product_order_details.empty:
+        st.markdown(f"**Order Details ({len(product_order_details)}):**")
+        st.dataframe(product_order_details, use_container_width=True, hide_index=True)
+        
+        # Orders that contain this product
+        order_ids = product_order_details['OrderID'].tolist()
+        if order_ids and not data['orders'].empty:
+            orders = data['orders'][data['orders']['OrderID'].isin(order_ids)]
+            if not orders.empty:
+                st.markdown("**Orders containing this Product:**")
+                st.dataframe(orders, use_container_width=True, hide_index=True)
+
+def show_category_relationships(data, category_id):
+    """Show all data related to a specific category"""
+    st.markdown("### 📊 Category Relationships")
+    
+    # Category details
+    category = data['categories'][data['categories']['CategoryID'] == category_id]
+    if not category.empty:
+        st.markdown("**Category Information:**")
+        st.json(category.iloc[0].to_dict())
+    
+    # Products in this category
+    category_products = data['products'][data['products']['CategoryID'] == category_id]
+    if not category_products.empty:
+        st.markdown(f"**Products in this Category ({len(category_products)}):**")
+        st.dataframe(category_products, use_container_width=True, hide_index=True)
+        
+        # Order details for products in this category
+        product_ids = category_products['ProductID'].tolist()
+        if product_ids and not data['orderdetails'].empty:
+            category_order_details = data['orderdetails'][data['orderdetails']['ProductID'].isin(product_ids)]
+            if not category_order_details.empty:
+                st.markdown(f"**Order Details for Products in this Category ({len(category_order_details)}):**")
+                st.dataframe(category_order_details, use_container_width=True, hide_index=True)
+
+def show_employee_relationships(data, employee_id):
+    """Show all data related to a specific employee"""
+    st.markdown("### 📊 Employee Relationships")
+    
+    # Employee details
+    employee = data['employees'][data['employees']['EmployeeID'] == employee_id]
+    if not employee.empty:
+        st.markdown("**Employee Information:**")
+        st.json(employee.iloc[0].to_dict())
+    
+    # Orders handled by this employee
+    employee_orders = data['orders'][data['orders']['EmployeeID'] == employee_id]
+    if not employee_orders.empty:
+        st.markdown(f"**Orders Handled ({len(employee_orders)}):**")
+        st.dataframe(employee_orders, use_container_width=True, hide_index=True)
+        
+        # Customers served by this employee
+        customer_ids = employee_orders['CustomerID'].dropna().unique()
+        if len(customer_ids) > 0 and not data['customers'].empty:
+            customers = data['customers'][data['customers']['CustomerID'].isin(customer_ids)]
+            if not customers.empty:
+                st.markdown(f"**Customers Served ({len(customers)}):**")
+                st.dataframe(customers, use_container_width=True, hide_index=True)
+
 def all_data_tables_page(data):
     """All Data Tables Page"""
     st.markdown('<h1 class="main-header">📋 All Data Tables</h1>', unsafe_allow_html=True)
@@ -871,7 +1097,7 @@ def main():
     
     page = st.sidebar.selectbox(
         "Choose a page:",
-        ["Customer Insights", "Orders Overview", "Sales & Products", "Employees", "All Data Tables"]
+        ["Customer Insights", "Orders Overview", "Sales & Products", "Employees", "Data Relationships", "All Data Tables"]
     )
     
     # Display selected page
@@ -883,6 +1109,8 @@ def main():
         sales_products_page(data)
     elif page == "Employees":
         employees_page(data)
+    elif page == "Data Relationships":
+        data_relationships_page(data)
     elif page == "All Data Tables":
         all_data_tables_page(data)
     
