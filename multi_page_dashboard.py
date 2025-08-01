@@ -802,283 +802,140 @@ def employees_page(data):
     )
 
 def data_relationships_page(data):
-    """Data Relationships Page - Show comprehensive related data across all tables"""
-    st.markdown('<h1 class="main-header">🔗 Comprehensive Data Relationships</h1>', unsafe_allow_html=True)
+    """Enhanced Data Relationships Page with comprehensive sidebar filters and detailed data display"""
+    st.markdown('<h1 class="main-header">🔗 Advanced Data Relationships Dashboard</h1>', unsafe_allow_html=True)
     
     st.markdown("""
     <div style='background-color: #f0f8ff; padding: 1rem; border-radius: 0.5rem; margin-bottom: 2rem;'>
-        <h3>🔍 Complete Data Integration:</h3>
+        <h3>🔍 Interactive Data Exploration:</h3>
         <ul>
-            <li>View all connected data from Orders, Order Details, Products, Categories, Customers, and Employees</li>
-            <li>Interactive filters and visualizations for any selected data</li>
-            <li>Real-time charts and analytics for your selected criteria</li>
+            <li>Select any filter to see detailed related information across all tables</li>
+            <li>View customer details, orders, products, and employee information</li>
+            <li>Interactive charts and analytics for your selected criteria</li>
+            <li>Export filtered data for further analysis</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
     
-    # Create comprehensive joined dataset
-    try:
-        # Your exact SQL query implementation
-        comprehensive_data = create_comprehensive_dataset(data)
+    # Sidebar Filters
+    st.sidebar.header("🔍 Sidebar Filters")
+    
+    # Get unique values for filters
+    order_ids = ['All'] + sorted(data['orders']['OrderID'].unique().tolist()) if not data['orders'].empty else ['All']
+    customer_ids = ['All'] + sorted(data['customers']['CustomerID'].unique().tolist()) if not data['customers'].empty else ['All']
+    employee_ids = ['All'] + sorted(data['employees']['EmployeeID'].unique().tolist()) if not data['employees'].empty else ['All']
+    product_ids = ['All'] + sorted(data['products']['ProductID'].unique().tolist()) if not data['products'].empty else ['All']
+    category_ids = ['All'] + sorted(data['categories']['CategoryID'].unique().tolist()) if not data['categories'].empty else ['All']
+    
+    # Filter dropdowns
+    selected_order = st.sidebar.selectbox("📦 OrderID (from Orders):", order_ids)
+    selected_customer = st.sidebar.selectbox("👤 CustomerID (from Customers):", customer_ids)
+    selected_employee = st.sidebar.selectbox("👨‍💼 EmployeeID (from Employees):", employee_ids)
+    selected_product = st.sidebar.selectbox("📦 ProductID (from Products):", product_ids)
+    selected_category = st.sidebar.selectbox("🏷️ CategoryID (from Categories):", category_ids)
+    
+    # Date Range Filter
+    if not data['orders'].empty and 'OrderDate' in data['orders'].columns:
+        data['orders']['OrderDate'] = pd.to_datetime(data['orders']['OrderDate'], errors='coerce')
+        min_date = data['orders']['OrderDate'].min()
+        max_date = data['orders']['OrderDate'].max()
         
-        if comprehensive_data.empty:
-            st.error("No data available for comprehensive analysis")
-            return
+        if pd.notna(min_date) and pd.notna(max_date):
+            date_range = st.sidebar.date_input(
+                "📅 Date Range (OrderDate):",
+                value=(min_date.date(), max_date.date()),
+                min_value=min_date.date(),
+                max_value=max_date.date()
+            )
+        else:
+            date_range = None
+    else:
+        date_range = None
+    
+    # Determine which filter is active and show detailed information
+    active_filter = None
+    if selected_order != 'All':
+        active_filter = 'OrderID'
+        filter_value = selected_order
+    elif selected_customer != 'All':
+        active_filter = 'CustomerID'
+        filter_value = selected_customer
+    elif selected_employee != 'All':
+        active_filter = 'EmployeeID'
+        filter_value = selected_employee
+    elif selected_product != 'All':
+        active_filter = 'ProductID'
+        filter_value = selected_product
+    elif selected_category != 'All':
+        active_filter = 'CategoryID'
+        filter_value = selected_category
+    elif date_range and len(date_range) == 2:
+        active_filter = 'DateRange'
+        filter_value = date_range
+    
+    # Main content area
+    if active_filter:
+        st.header(f"📊 Detailed Analysis for {active_filter}: {filter_value}")
         
-        st.success(f"✅ Loaded {len(comprehensive_data):,} comprehensive records")
+        # Create tabs for organized display
+        tab1, tab2, tab3, tab4 = st.tabs(["📋 Related Data", "📈 Analytics", "📊 Charts", "💾 Export"])
         
-        # Sidebar filters
-        st.sidebar.header("🔍 Interactive Filters")
-        
-        # OrderID filter
-        if 'OrderID' in comprehensive_data.columns:
-            order_ids = ['All'] + sorted(comprehensive_data['OrderID'].unique().tolist())
-            selected_order = st.sidebar.selectbox("Select OrderID:", order_ids)
-        
-        # Customer filter
-        if 'CustomerCompany' in comprehensive_data.columns:
-            customers = ['All'] + sorted(comprehensive_data['CustomerCompany'].unique().tolist())
-            selected_customer = st.sidebar.selectbox("Select Customer:", customers)
-        
-        # Employee filter
-        if 'EmployeeID' in comprehensive_data.columns:
-            employees = ['All'] + sorted(comprehensive_data['EmployeeID'].unique().tolist())
-            selected_employee = st.sidebar.selectbox("Select EmployeeID:", employees)
-        
-        # Category filter
-        if 'CategoryName' in comprehensive_data.columns:
-            categories = ['All'] + sorted(comprehensive_data['CategoryName'].unique().tolist())
-            selected_category = st.sidebar.selectbox("Select Category:", categories)
-        
-        # Date filter
-        if 'ShippedDate' in comprehensive_data.columns:
-            comprehensive_data['ShippedDate'] = pd.to_datetime(comprehensive_data['ShippedDate'], errors='coerce')
-            min_date = comprehensive_data['ShippedDate'].min()
-            max_date = comprehensive_data['ShippedDate'].max()
+        with tab1:
+            st.subheader("🔗 Related Information")
             
-            if pd.notna(min_date) and pd.notna(max_date):
-                date_range = st.sidebar.date_input(
-                    "Select Date Range:",
-                    value=(min_date.date(), max_date.date()),
-                    min_value=min_date.date(),
-                    max_value=max_date.date()
-                )
+            if active_filter == 'CustomerID':
+                show_customer_detailed_relationships(data, filter_value)
+            elif active_filter == 'OrderID':
+                show_order_detailed_relationships(data, filter_value)
+            elif active_filter == 'EmployeeID':
+                show_employee_detailed_relationships(data, filter_value)
+            elif active_filter == 'ProductID':
+                show_product_detailed_relationships(data, filter_value)
+            elif active_filter == 'CategoryID':
+                show_category_detailed_relationships(data, filter_value)
+            elif active_filter == 'DateRange':
+                show_date_range_relationships(data, filter_value)
         
-        # Apply filters
-        filtered_data = comprehensive_data.copy()
+        with tab2:
+            st.subheader("📈 Key Metrics & Analytics")
+            show_analytics_for_filter(data, active_filter, filter_value)
         
-        if 'OrderID' in comprehensive_data.columns and selected_order != 'All':
-            filtered_data = filtered_data[filtered_data['OrderID'] == selected_order]
+        with tab3:
+            st.subheader("📊 Interactive Charts")
+            show_charts_for_filter(data, active_filter, filter_value)
         
-        if 'CustomerCompany' in comprehensive_data.columns and selected_customer != 'All':
-            filtered_data = filtered_data[filtered_data['CustomerCompany'] == selected_customer]
+        with tab4:
+            st.subheader("💾 Export Data")
+            show_export_options(data, active_filter, filter_value)
+    
+    else:
+        # Show overview when no filter is selected
+        st.header("📋 Data Overview")
+        st.info("👈 Select a filter from the sidebar to explore detailed relationships")
         
-        if 'EmployeeID' in comprehensive_data.columns and selected_employee != 'All':
-            filtered_data = filtered_data[filtered_data['EmployeeID'] == selected_employee]
-        
-        if 'CategoryName' in comprehensive_data.columns and selected_category != 'All':
-            filtered_data = filtered_data[filtered_data['CategoryName'] == selected_category]
-        
-        if 'ShippedDate' in comprehensive_data.columns and len(date_range) == 2:
-            start_date, end_date = date_range
-            filtered_data = filtered_data[
-                (filtered_data['ShippedDate'].dt.date >= start_date) &
-                (filtered_data['ShippedDate'].dt.date <= end_date)
-            ]
-        
-        # Key Metrics
-        st.header("📈 Comprehensive Metrics")
-        
-        col1, col2, col3, col4 = st.columns(4)
+        # Show summary statistics
+        col1, col2, col3 = st.columns(3)
         
         with col1:
-            total_orders = filtered_data['OrderID'].nunique()
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3>Total Orders</h3>
-                <h2>{total_orders:,}</h2>
-            </div>
-            """, unsafe_allow_html=True)
+            st.metric("Total Orders", len(data['orders']) if not data['orders'].empty else 0)
+            st.metric("Total Customers", len(data['customers']) if not data['customers'].empty else 0)
         
         with col2:
-            total_revenue = (filtered_data['UnitPrice'] * filtered_data['Quantity'] * (1 - filtered_data['Discount'])).sum()
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3>Total Revenue</h3>
-                <h2>${total_revenue:,.2f}</h2>
-            </div>
-            """, unsafe_allow_html=True)
+            st.metric("Total Products", len(data['products']) if not data['products'].empty else 0)
+            st.metric("Total Employees", len(data['employees']) if not data['employees'].empty else 0)
         
         with col3:
-            unique_customers = filtered_data['CustomerCompany'].nunique() if 'CustomerCompany' in filtered_data.columns else 0
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3>Unique Customers</h3>
-                <h2>{unique_customers:,}</h2>
-            </div>
-            """, unsafe_allow_html=True)
+            st.metric("Total Categories", len(data['categories']) if not data['categories'].empty else 0)
+            st.metric("Order Details", len(data['orderdetails']) if not data['orderdetails'].empty else 0)
         
-        with col4:
-            unique_products = filtered_data['ProductName'].nunique()
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3>Products Sold</h3>
-                <h2>{unique_products:,}</h2>
-            </div>
-            """, unsafe_allow_html=True)
+        # Show sample data from each table
+        st.subheader("📋 Sample Data from Each Table")
         
-        st.markdown("---")
-        
-        # Visualizations
-        st.header("📊 Data Visualizations")
-        
-        # Row 1: Quantity by Category and Orders by Customer
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("Quantity Ordered per Category")
-            category_quantity = filtered_data.groupby('CategoryName')['Quantity'].sum().sort_values(ascending=False)
-            
-            fig_category_quantity = px.bar(
-                x=category_quantity.index,
-                y=category_quantity.values,
-                title="Quantity Ordered per Category",
-                labels={'x': 'Category', 'y': 'Total Quantity'},
-                color=category_quantity.values,
-                color_continuous_scale='Blues'
-            )
-            fig_category_quantity.update_xaxes(tickangle=45)
-            fig_category_quantity.update_layout(height=400)
-            st.plotly_chart(fig_category_quantity, use_container_width=True)
-        
-        with col2:
-            st.subheader("Orders by Customer")
-            customer_orders = filtered_data.groupby('CustomerCompany')['OrderID'].nunique().sort_values(ascending=False).head(10)
-            
-            fig_customer_orders = px.pie(
-                values=customer_orders.values,
-                names=customer_orders.index,
-                title="Top 10 Customers by Order Count",
-                hole=0.3
-            )
-            fig_customer_orders.update_layout(height=400)
-            st.plotly_chart(fig_customer_orders, use_container_width=True)
-        
-        # Row 2: Revenue by Category and Discounts by Product
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("Revenue by Category")
-            category_revenue = filtered_data.groupby('CategoryName').apply(
-                lambda x: (x['UnitPrice'] * x['Quantity'] * (1 - x['Discount'])).sum()
-            ).sort_values(ascending=False)
-            
-            fig_category_revenue = px.pie(
-                values=category_revenue.values,
-                names=category_revenue.index,
-                title="Revenue Distribution by Category",
-                hole=0.3
-            )
-            fig_category_revenue.update_layout(height=400)
-            st.plotly_chart(fig_category_revenue, use_container_width=True)
-        
-        with col2:
-            st.subheader("Average Discounts by Product")
-            product_discounts = filtered_data.groupby('ProductName')['Discount'].mean().sort_values(ascending=False).head(10)
-            
-            fig_product_discounts = px.bar(
-                x=product_discounts.values,
-                y=product_discounts.index,
-                orientation='h',
-                title="Top 10 Products by Average Discount",
-                labels={'x': 'Average Discount', 'y': 'Product'},
-                color=product_discounts.values,
-                color_continuous_scale='Reds'
-            )
-            fig_product_discounts.update_layout(height=400)
-            st.plotly_chart(fig_product_discounts, use_container_width=True)
-        
-        # Row 3: Time Series and Employee Performance
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if 'ShippedDate' in filtered_data.columns:
-                st.subheader("Revenue Over Time")
-                filtered_data['ShippedDate'] = pd.to_datetime(filtered_data['ShippedDate'], errors='coerce')
-                daily_revenue = filtered_data.groupby(filtered_data['ShippedDate'].dt.date).apply(
-                    lambda x: (x['UnitPrice'] * x['Quantity'] * (1 - x['Discount'])).sum()
-                ).reset_index()
-                daily_revenue.columns = ['Date', 'Revenue']
-                
-                fig_time_revenue = px.line(
-                    daily_revenue,
-                    x='Date',
-                    y='Revenue',
-                    title="Daily Revenue Trend",
-                    labels={'Date': 'Date', 'Revenue': 'Revenue ($)'}
-                )
-                fig_time_revenue.update_layout(height=400)
-                st.plotly_chart(fig_time_revenue, use_container_width=True)
-        
-        with col2:
-            if 'EmployeeID' in filtered_data.columns and 'FirstName' in filtered_data.columns and 'LastName' in filtered_data.columns:
-                st.subheader("Employee Performance")
-                # Create employee full name
-                filtered_data['EmployeeName'] = filtered_data['FirstName'] + ' ' + filtered_data['LastName']
-                
-                employee_performance = filtered_data.groupby('EmployeeName').agg({
-                    'OrderID': 'nunique',
-                    'UnitPrice': lambda x: (x * filtered_data.loc[x.index, 'Quantity'] * (1 - filtered_data.loc[x.index, 'Discount'])).sum()
-                }).reset_index()
-                employee_performance.columns = ['EmployeeName', 'Orders', 'Revenue']
-                
-                fig_employee = px.bar(
-                    employee_performance,
-                    x='EmployeeName',
-                    y='Revenue',
-                    title="Employee Performance by Revenue",
-                    labels={'EmployeeName': 'Employee', 'Revenue': 'Revenue ($)'},
-                    color='Orders',
-                    color_continuous_scale='Viridis'
-                )
-                fig_employee.update_xaxes(tickangle=45)
-                fig_employee.update_layout(height=400)
-                st.plotly_chart(fig_employee, use_container_width=True)
-        
-        # Detailed Data Table
-        st.markdown("---")
-        st.header("📋 Detailed Data Table")
-        
-        # Search functionality
-        search_term = st.text_input("🔍 Search in all columns:", key="search_comprehensive")
-        
-        display_data = filtered_data.copy()
-        if search_term:
-            search_mask = pd.DataFrame([display_data[col].astype(str).str.contains(search_term, case=False, na=False) 
-                                      for col in display_data.select_dtypes(include=['object']).columns]).any()
-            display_data = display_data[search_mask]
-        
-        st.dataframe(
-            display_data,
-            use_container_width=True,
-            hide_index=True
-        )
-        
-        # Download section
-        st.markdown("---")
-        st.header("💾 Export Data")
-        
-        csv_data = display_data.to_csv(index=False)
-        st.download_button(
-            label="📥 Download Comprehensive Data (CSV)",
-            data=csv_data,
-            file_name=f"comprehensive_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
-        )
-        
-    except Exception as e:
-        st.error(f"Error creating comprehensive dataset: {str(e)}")
-        st.info("Please ensure all required tables are available in your database.")
+        tables = ['customers', 'orders', 'products', 'categories', 'employees', 'orderdetails']
+        for table in tables:
+            if not data[table].empty:
+                with st.expander(f"📊 {table.title()} (First 5 rows)"):
+                    st.dataframe(data[table].head(), use_container_width=True)
 
 def create_comprehensive_dataset(data):
     """Create comprehensive dataset using your exact SQL query logic"""
@@ -1295,6 +1152,438 @@ def show_employee_relationships(data, employee_id):
             if not customers.empty:
                 st.markdown(f"**Customers Served ({len(customers)}):**")
                 st.dataframe(customers, use_container_width=True, hide_index=True)
+
+# Enhanced Data Relationships Helper Functions
+def show_customer_detailed_relationships(data, customer_id):
+    """Show detailed customer relationships with expandable sections"""
+    customer = data['customers'][data['customers']['CustomerID'] == customer_id]
+    
+    if not customer.empty:
+        with st.expander("👤 Customer Details", expanded=True):
+            st.json(customer.iloc[0].to_dict())
+    
+    # Customer's orders
+    customer_orders = data['orders'][data['orders']['CustomerID'] == customer_id]
+    if not customer_orders.empty:
+        with st.expander(f"📦 Orders ({len(customer_orders)})", expanded=True):
+            st.dataframe(customer_orders, use_container_width=True, hide_index=True)
+            
+            # Order details for this customer
+            order_ids = customer_orders['OrderID'].tolist()
+            if order_ids and not data['orderdetails'].empty:
+                customer_order_details = data['orderdetails'][data['orderdetails']['OrderID'].isin(order_ids)]
+                if not customer_order_details.empty:
+                    st.subheader("Order Details")
+                    st.dataframe(customer_order_details, use_container_width=True, hide_index=True)
+                    
+                    # Products purchased by this customer
+                    product_ids = customer_order_details['ProductID'].unique()
+                    if len(product_ids) > 0 and not data['products'].empty:
+                        products = data['products'][data['products']['ProductID'].isin(product_ids)]
+                        if not products.empty:
+                            st.subheader("Products Purchased")
+                            st.dataframe(products, use_container_width=True, hide_index=True)
+
+def show_order_detailed_relationships(data, order_id):
+    """Show detailed order relationships with expandable sections"""
+    order = data['orders'][data['orders']['OrderID'] == order_id]
+    
+    if not order.empty:
+        with st.expander("📦 Order Details", expanded=True):
+            st.json(order.iloc[0].to_dict())
+        
+        # Customer who placed the order
+        if 'CustomerID' in order.columns:
+            customer_id = order.iloc[0]['CustomerID']
+            customer = data['customers'][data['customers']['CustomerID'] == customer_id]
+            if not customer.empty:
+                with st.expander("👤 Customer Information", expanded=True):
+                    st.json(customer.iloc[0].to_dict())
+        
+        # Employee who handled the order
+        if 'EmployeeID' in order.columns:
+            employee_id = order.iloc[0]['EmployeeID']
+            employee = data['employees'][data['employees']['EmployeeID'] == employee_id]
+            if not employee.empty:
+                with st.expander("👨‍💼 Employee Information", expanded=True):
+                    st.json(employee.iloc[0].to_dict())
+        
+        # Order details
+        order_details = data['orderdetails'][data['orderdetails']['OrderID'] == order_id]
+        if not order_details.empty:
+            with st.expander(f"📋 Order Details ({len(order_details)})", expanded=True):
+                st.dataframe(order_details, use_container_width=True, hide_index=True)
+                
+                # Product information for order details
+                product_ids = order_details['ProductID'].tolist()
+                if product_ids and not data['products'].empty:
+                    products = data['products'][data['products']['ProductID'].isin(product_ids)]
+                    if not products.empty:
+                        st.subheader("Products in this Order")
+                        st.dataframe(products, use_container_width=True, hide_index=True)
+
+def show_employee_detailed_relationships(data, employee_id):
+    """Show detailed employee relationships with expandable sections"""
+    employee = data['employees'][data['employees']['EmployeeID'] == employee_id]
+    
+    if not employee.empty:
+        with st.expander("👨‍💼 Employee Details", expanded=True):
+            st.json(employee.iloc[0].to_dict())
+    
+    # Orders handled by this employee
+    employee_orders = data['orders'][data['orders']['EmployeeID'] == employee_id]
+    if not employee_orders.empty:
+        with st.expander(f"📦 Orders Handled ({len(employee_orders)})", expanded=True):
+            st.dataframe(employee_orders, use_container_width=True, hide_index=True)
+            
+            # Customers served by this employee
+            customer_ids = employee_orders['CustomerID'].dropna().unique()
+            if len(customer_ids) > 0 and not data['customers'].empty:
+                customers = data['customers'][data['customers']['CustomerID'].isin(customer_ids)]
+                if not customers.empty:
+                    st.subheader("Customers Served")
+                    st.dataframe(customers, use_container_width=True, hide_index=True)
+            
+            # Products sold by this employee
+            order_ids = employee_orders['OrderID'].tolist()
+            if order_ids and not data['orderdetails'].empty:
+                employee_order_details = data['orderdetails'][data['orderdetails']['OrderID'].isin(order_ids)]
+                if not employee_order_details.empty:
+                    st.subheader("Order Details")
+                    st.dataframe(employee_order_details, use_container_width=True, hide_index=True)
+                    
+                    product_ids = employee_order_details['ProductID'].unique()
+                    if len(product_ids) > 0 and not data['products'].empty:
+                        products = data['products'][data['products']['ProductID'].isin(product_ids)]
+                        if not products.empty:
+                            st.subheader("Products Sold")
+                            st.dataframe(products, use_container_width=True, hide_index=True)
+
+def show_product_detailed_relationships(data, product_id):
+    """Show detailed product relationships with expandable sections"""
+    product = data['products'][data['products']['ProductID'] == product_id]
+    
+    if not product.empty:
+        with st.expander("📦 Product Details", expanded=True):
+            st.json(product.iloc[0].to_dict())
+        
+        # Category information
+        if 'CategoryID' in product.columns:
+            category_id = product.iloc[0]['CategoryID']
+            category = data['categories'][data['categories']['CategoryID'] == category_id]
+            if not category.empty:
+                with st.expander("🏷️ Category Information", expanded=True):
+                    st.json(category.iloc[0].to_dict())
+        
+        # Order details for this product
+        product_order_details = data['orderdetails'][data['orderdetails']['ProductID'] == product_id]
+        if not product_order_details.empty:
+            with st.expander(f"📋 Order Details ({len(product_order_details)})", expanded=True):
+                st.dataframe(product_order_details, use_container_width=True, hide_index=True)
+                
+                # Orders that contain this product
+                order_ids = product_order_details['OrderID'].tolist()
+                if order_ids and not data['orders'].empty:
+                    orders = data['orders'][data['orders']['OrderID'].isin(order_ids)]
+                    if not orders.empty:
+                        st.subheader("Orders containing this Product")
+                        st.dataframe(orders, use_container_width=True, hide_index=True)
+                        
+                        # Customers who bought this product
+                        customer_ids = orders['CustomerID'].dropna().unique()
+                        if len(customer_ids) > 0 and not data['customers'].empty:
+                            customers = data['customers'][data['customers']['CustomerID'].isin(customer_ids)]
+                            if not customers.empty:
+                                st.subheader("Customers who bought this Product")
+                                st.dataframe(customers, use_container_width=True, hide_index=True)
+
+def show_category_detailed_relationships(data, category_id):
+    """Show detailed category relationships with expandable sections"""
+    category = data['categories'][data['categories']['CategoryID'] == category_id]
+    
+    if not category.empty:
+        with st.expander("🏷️ Category Details", expanded=True):
+            st.json(category.iloc[0].to_dict())
+    
+    # Products in this category
+    category_products = data['products'][data['products']['CategoryID'] == category_id]
+    if not category_products.empty:
+        with st.expander(f"📦 Products in Category ({len(category_products)})", expanded=True):
+            st.dataframe(category_products, use_container_width=True, hide_index=True)
+            
+            # Order details for products in this category
+            product_ids = category_products['ProductID'].tolist()
+            if product_ids and not data['orderdetails'].empty:
+                category_order_details = data['orderdetails'][data['orderdetails']['ProductID'].isin(product_ids)]
+                if not category_order_details.empty:
+                    st.subheader("Order Details for Products in this Category")
+                    st.dataframe(category_order_details, use_container_width=True, hide_index=True)
+                    
+                    # Orders involving products in this category
+                    order_ids = category_order_details['OrderID'].unique()
+                    if len(order_ids) > 0 and not data['orders'].empty:
+                        orders = data['orders'][data['orders']['OrderID'].isin(order_ids)]
+                        if not orders.empty:
+                            st.subheader("Orders involving Products in this Category")
+                            st.dataframe(orders, use_container_width=True, hide_index=True)
+
+def show_date_range_relationships(data, date_range):
+    """Show relationships for a specific date range"""
+    start_date, end_date = date_range
+    
+    # Filter orders by date range
+    if not data['orders'].empty and 'OrderDate' in data['orders'].columns:
+        data['orders']['OrderDate'] = pd.to_datetime(data['orders']['OrderDate'], errors='coerce')
+        date_filtered_orders = data['orders'][
+            (data['orders']['OrderDate'].dt.date >= start_date) &
+            (data['orders']['OrderDate'].dt.date <= end_date)
+        ]
+        
+        if not date_filtered_orders.empty:
+            with st.expander(f"📦 Orders in Date Range ({len(date_filtered_orders)})", expanded=True):
+                st.dataframe(date_filtered_orders, use_container_width=True, hide_index=True)
+                
+                # Order details for this date range
+                order_ids = date_filtered_orders['OrderID'].tolist()
+                if order_ids and not data['orderdetails'].empty:
+                    date_order_details = data['orderdetails'][data['orderdetails']['OrderID'].isin(order_ids)]
+                    if not date_order_details.empty:
+                        st.subheader("Order Details in Date Range")
+                        st.dataframe(date_order_details, use_container_width=True, hide_index=True)
+                        
+                        # Products sold in this date range
+                        product_ids = date_order_details['ProductID'].unique()
+                        if len(product_ids) > 0 and not data['products'].empty:
+                            products = data['products'][data['products']['ProductID'].isin(product_ids)]
+                            if not products.empty:
+                                st.subheader("Products Sold in Date Range")
+                                st.dataframe(products, use_container_width=True, hide_index=True)
+                        
+                        # Customers who ordered in this date range
+                        customer_ids = date_filtered_orders['CustomerID'].dropna().unique()
+                        if len(customer_ids) > 0 and not data['customers'].empty:
+                            customers = data['customers'][data['customers']['CustomerID'].isin(customer_ids)]
+                            if not customers.empty:
+                                st.subheader("Customers who Ordered in Date Range")
+                                st.dataframe(customers, use_container_width=True, hide_index=True)
+
+def show_analytics_for_filter(data, active_filter, filter_value):
+    """Show analytics and metrics for the selected filter"""
+    if active_filter == 'CustomerID':
+        # Customer analytics
+        customer_orders = data['orders'][data['orders']['CustomerID'] == filter_value]
+        if not customer_orders.empty:
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Orders", len(customer_orders))
+            with col2:
+                st.metric("Total Revenue", f"${customer_orders.get('Freight', 0).sum():,.2f}")
+            with col3:
+                st.metric("Countries Shipped To", customer_orders['ShipCountry'].nunique())
+            with col4:
+                st.metric("Cities Shipped To", customer_orders['ShipCity'].nunique())
+    
+    elif active_filter == 'OrderID':
+        # Order analytics
+        order = data['orders'][data['orders']['OrderID'] == filter_value]
+        if not order.empty:
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Order Value", f"${order.iloc[0].get('Freight', 0):,.2f}")
+            with col2:
+                st.metric("Ship Country", order.iloc[0].get('ShipCountry', 'N/A'))
+            with col3:
+                st.metric("Ship City", order.iloc[0].get('ShipCity', 'N/A'))
+            with col4:
+                st.metric("Order Date", order.iloc[0].get('OrderDate', 'N/A'))
+    
+    elif active_filter == 'EmployeeID':
+        # Employee analytics
+        employee_orders = data['orders'][data['orders']['EmployeeID'] == filter_value]
+        if not employee_orders.empty:
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Orders Handled", len(employee_orders))
+            with col2:
+                st.metric("Total Revenue", f"${employee_orders.get('Freight', 0).sum():,.2f}")
+            with col3:
+                st.metric("Customers Served", employee_orders['CustomerID'].nunique())
+            with col4:
+                st.metric("Countries Served", employee_orders['ShipCountry'].nunique())
+    
+    elif active_filter == 'ProductID':
+        # Product analytics
+        product_orders = data['orderdetails'][data['orderdetails']['ProductID'] == filter_value]
+        if not product_orders.empty:
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Quantity Sold", product_orders['Quantity'].sum())
+            with col2:
+                st.metric("Total Revenue", f"${(product_orders['UnitPrice'] * product_orders['Quantity']).sum():,.2f}")
+            with col3:
+                st.metric("Orders Containing Product", product_orders['OrderID'].nunique())
+            with col4:
+                st.metric("Average Discount", f"{product_orders['Discount'].mean():.2%}")
+    
+    elif active_filter == 'CategoryID':
+        # Category analytics
+        category_products = data['products'][data['products']['CategoryID'] == filter_value]
+        if not category_products.empty:
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Products in Category", len(category_products))
+            with col2:
+                st.metric("Average Unit Price", f"${category_products['UnitPrice'].mean():,.2f}")
+            with col3:
+                st.metric("Total Stock", category_products['UnitsInStock'].sum())
+            with col4:
+                st.metric("Discontinued Products", len(category_products[category_products['Discontinued'] == True]))
+
+def show_charts_for_filter(data, active_filter, filter_value):
+    """Show interactive charts for the selected filter"""
+    if active_filter == 'CustomerID':
+        # Customer charts
+        customer_orders = data['orders'][data['orders']['CustomerID'] == filter_value]
+        if not customer_orders.empty:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Orders over time
+                if 'OrderDate' in customer_orders.columns:
+                    customer_orders['OrderDate'] = pd.to_datetime(customer_orders['OrderDate'], errors='coerce')
+                    orders_by_date = customer_orders.groupby(customer_orders['OrderDate'].dt.date).size().reset_index(name='count')
+                    fig = px.line(orders_by_date, x='OrderDate', y='count', title="Orders Over Time")
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                # Orders by ship country
+                country_counts = customer_orders['ShipCountry'].value_counts()
+                fig = px.pie(values=country_counts.values, names=country_counts.index, title="Orders by Ship Country")
+                st.plotly_chart(fig, use_container_width=True)
+    
+    elif active_filter == 'EmployeeID':
+        # Employee charts
+        employee_orders = data['orders'][data['orders']['EmployeeID'] == filter_value]
+        if not employee_orders.empty:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Orders by customer
+                customer_counts = employee_orders['CustomerID'].value_counts().head(10)
+                fig = px.bar(x=customer_counts.index, y=customer_counts.values, title="Top 10 Customers")
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                # Orders by ship country
+                country_counts = employee_orders['ShipCountry'].value_counts()
+                fig = px.pie(values=country_counts.values, names=country_counts.index, title="Orders by Ship Country")
+                st.plotly_chart(fig, use_container_width=True)
+    
+    elif active_filter == 'ProductID':
+        # Product charts
+        product_orders = data['orderdetails'][data['orderdetails']['ProductID'] == filter_value]
+        if not product_orders.empty:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Quantity sold over time (if order dates available)
+                if not data['orders'].empty:
+                    order_dates = data['orders'][['OrderID', 'OrderDate']]
+                    product_with_dates = product_orders.merge(order_dates, on='OrderID', how='left')
+                    if 'OrderDate' in product_with_dates.columns:
+                        product_with_dates['OrderDate'] = pd.to_datetime(product_with_dates['OrderDate'], errors='coerce')
+                        quantity_by_date = product_with_dates.groupby(product_with_dates['OrderDate'].dt.date)['Quantity'].sum().reset_index()
+                        fig = px.line(quantity_by_date, x='OrderDate', y='Quantity', title="Quantity Sold Over Time")
+                        st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                # Revenue by order
+                product_orders['Revenue'] = product_orders['UnitPrice'] * product_orders['Quantity']
+                revenue_by_order = product_orders.groupby('OrderID')['Revenue'].sum().sort_values(ascending=False).head(10)
+                fig = px.bar(x=revenue_by_order.index, y=revenue_by_order.values, title="Top 10 Orders by Revenue")
+                st.plotly_chart(fig, use_container_width=True)
+
+def show_export_options(data, active_filter, filter_value):
+    """Show export options for the filtered data"""
+    st.subheader("📊 Export Filtered Data")
+    
+    if active_filter == 'CustomerID':
+        # Export customer-related data
+        customer_orders = data['orders'][data['orders']['CustomerID'] == filter_value]
+        if not customer_orders.empty:
+            csv_data = customer_orders.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Customer Orders (CSV)",
+                data=csv_data,
+                file_name=f"customer_{filter_value}_orders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+    
+    elif active_filter == 'OrderID':
+        # Export order-related data
+        order_details = data['orderdetails'][data['orderdetails']['OrderID'] == filter_value]
+        if not order_details.empty:
+            csv_data = order_details.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Order Details (CSV)",
+                data=csv_data,
+                file_name=f"order_{filter_value}_details_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+    
+    elif active_filter == 'EmployeeID':
+        # Export employee-related data
+        employee_orders = data['orders'][data['orders']['EmployeeID'] == filter_value]
+        if not employee_orders.empty:
+            csv_data = employee_orders.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Employee Orders (CSV)",
+                data=csv_data,
+                file_name=f"employee_{filter_value}_orders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+    
+    elif active_filter == 'ProductID':
+        # Export product-related data
+        product_orders = data['orderdetails'][data['orderdetails']['ProductID'] == filter_value]
+        if not product_orders.empty:
+            csv_data = product_orders.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Product Orders (CSV)",
+                data=csv_data,
+                file_name=f"product_{filter_value}_orders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+    
+    elif active_filter == 'CategoryID':
+        # Export category-related data
+        category_products = data['products'][data['products']['CategoryID'] == filter_value]
+        if not category_products.empty:
+            csv_data = category_products.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Category Products (CSV)",
+                data=csv_data,
+                file_name=f"category_{filter_value}_products_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+    
+    elif active_filter == 'DateRange':
+        # Export date range data
+        start_date, end_date = filter_value
+        if not data['orders'].empty and 'OrderDate' in data['orders'].columns:
+            data['orders']['OrderDate'] = pd.to_datetime(data['orders']['OrderDate'], errors='coerce')
+            date_filtered_orders = data['orders'][
+                (data['orders']['OrderDate'].dt.date >= start_date) &
+                (data['orders']['OrderDate'].dt.date <= end_date)
+            ]
+            if not date_filtered_orders.empty:
+                csv_data = date_filtered_orders.to_csv(index=False)
+                st.download_button(
+                    label="📥 Download Date Range Orders (CSV)",
+                    data=csv_data,
+                    file_name=f"orders_{start_date}_to_{end_date}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                    mime="text/csv"
+                )
 
 def all_data_tables_page(data):
     """All Data Tables Page"""
