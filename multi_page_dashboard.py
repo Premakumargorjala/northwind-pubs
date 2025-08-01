@@ -802,86 +802,343 @@ def employees_page(data):
     )
 
 def data_relationships_page(data):
-    """Data Relationships Page - Show related data across tables"""
-    st.markdown('<h1 class="main-header">🔗 Data Relationships Explorer</h1>', unsafe_allow_html=True)
+    """Data Relationships Page - Show comprehensive related data across all tables"""
+    st.markdown('<h1 class="main-header">🔗 Comprehensive Data Relationships</h1>', unsafe_allow_html=True)
     
     st.markdown("""
     <div style='background-color: #f0f8ff; padding: 1rem; border-radius: 0.5rem; margin-bottom: 2rem;'>
-        <h3>🔍 How to use this feature:</h3>
+        <h3>🔍 Complete Data Integration:</h3>
         <ul>
-            <li>Select a table and choose a record to explore</li>
-            <li>View all related data from other tables</li>
-            <li>See the complete data story for any record</li>
+            <li>View all connected data from Orders, Order Details, Products, Categories, Customers, and Employees</li>
+            <li>Interactive filters and visualizations for any selected data</li>
+            <li>Real-time charts and analytics for your selected criteria</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
     
-    # Table selection
-    table_options = {
-        'Customers': {'data': data['customers'], 'key_col': 'CustomerID'},
-        'Orders': {'data': data['orders'], 'key_col': 'OrderID'},
-        'Products': {'data': data['products'], 'key_col': 'ProductID'},
-        'Categories': {'data': data['categories'], 'key_col': 'CategoryID'},
-        'Employees': {'data': data['employees'], 'key_col': 'EmployeeID'}
-    }
-    
-    selected_table = st.selectbox("Select a table to explore:", list(table_options.keys()))
-    
-    if selected_table:
-        table_info = table_options[selected_table]
-        df = table_info['data']
-        key_col = table_info['key_col']
+    # Create comprehensive joined dataset
+    try:
+        # Your exact SQL query implementation
+        comprehensive_data = create_comprehensive_dataset(data)
         
-        if df.empty:
-            st.warning(f"No data available for {selected_table} table")
+        if comprehensive_data.empty:
+            st.error("No data available for comprehensive analysis")
             return
         
-        # Display the selected table
-        st.subheader(f"📋 {selected_table} Table")
-        st.write(f"**Total Records:** {len(df):,}")
+        st.success(f"✅ Loaded {len(comprehensive_data):,} comprehensive records")
         
-        # Search and filter functionality
-        col1, col2 = st.columns(2)
+        # Sidebar filters
+        st.sidebar.header("🔍 Data Filters")
+        
+        # Customer filter
+        customers = ['All'] + sorted(comprehensive_data['CompanyName'].unique().tolist())
+        selected_customer = st.sidebar.selectbox("Select Customer:", customers)
+        
+        # Category filter
+        categories = ['All'] + sorted(comprehensive_data['CategoryName'].unique().tolist())
+        selected_category = st.sidebar.selectbox("Select Category:", categories)
+        
+        # Employee filter
+        if 'EmployeeID' in comprehensive_data.columns:
+            employees = ['All'] + sorted(comprehensive_data['EmployeeID'].unique().tolist())
+            selected_employee = st.sidebar.selectbox("Select Employee:", employees)
+        
+        # Date filter
+        if 'ShippedDate' in comprehensive_data.columns:
+            comprehensive_data['ShippedDate'] = pd.to_datetime(comprehensive_data['ShippedDate'], errors='coerce')
+            min_date = comprehensive_data['ShippedDate'].min()
+            max_date = comprehensive_data['ShippedDate'].max()
+            
+            if pd.notna(min_date) and pd.notna(max_date):
+                date_range = st.sidebar.date_input(
+                    "Select Date Range:",
+                    value=(min_date.date(), max_date.date()),
+                    min_value=min_date.date(),
+                    max_value=max_date.date()
+                )
+        
+        # Apply filters
+        filtered_data = comprehensive_data.copy()
+        
+        if selected_customer != 'All':
+            filtered_data = filtered_data[filtered_data['CompanyName'] == selected_customer]
+        
+        if selected_category != 'All':
+            filtered_data = filtered_data[filtered_data['CategoryName'] == selected_category]
+        
+        if 'EmployeeID' in comprehensive_data.columns and selected_employee != 'All':
+            filtered_data = filtered_data[filtered_data['EmployeeID'] == selected_employee]
+        
+        if 'ShippedDate' in comprehensive_data.columns and len(date_range) == 2:
+            start_date, end_date = date_range
+            filtered_data = filtered_data[
+                (filtered_data['ShippedDate'].dt.date >= start_date) &
+                (filtered_data['ShippedDate'].dt.date <= end_date)
+            ]
+        
+        # Key Metrics
+        st.header("📈 Comprehensive Metrics")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
         with col1:
-            search_term = st.text_input(f"🔍 Search in {selected_table}:", key=f"search_rel_{selected_table}")
+            total_orders = filtered_data['OrderID'].nunique()
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3>Total Orders</h3>
+                <h2>{total_orders:,}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+        
         with col2:
-            if key_col in df.columns:
-                unique_keys = df[key_col].dropna().unique()
-                selected_key = st.selectbox(f"Select a {key_col}:", [''] + list(unique_keys), key=f"key_select_{selected_table}")
+            total_revenue = (filtered_data['UnitPrice'] * filtered_data['Quantity'] * (1 - filtered_data['Discount'])).sum()
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3>Total Revenue</h3>
+                <h2>${total_revenue:,.2f}</h2>
+            </div>
+            """, unsafe_allow_html=True)
         
-        # Filter data based on search and selection
-        display_df = df.copy()
+        with col3:
+            unique_customers = filtered_data['CompanyName'].nunique()
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3>Unique Customers</h3>
+                <h2>{unique_customers:,}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col4:
+            unique_products = filtered_data['ProductName'].nunique()
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3>Products Sold</h3>
+                <h2>{unique_products:,}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # Visualizations
+        st.header("📊 Data Visualizations")
+        
+        # Row 1: Revenue and Orders by Category
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("Revenue by Category")
+            category_revenue = filtered_data.groupby('CategoryName').apply(
+                lambda x: (x['UnitPrice'] * x['Quantity'] * (1 - x['Discount'])).sum()
+            ).sort_values(ascending=False)
+            
+            fig_category_revenue = px.pie(
+                values=category_revenue.values,
+                names=category_revenue.index,
+                title="Revenue Distribution by Category",
+                hole=0.3
+            )
+            fig_category_revenue.update_layout(height=400)
+            st.plotly_chart(fig_category_revenue, use_container_width=True)
+        
+        with col2:
+            st.subheader("Orders by Category")
+            category_orders = filtered_data.groupby('CategoryName')['OrderID'].nunique().sort_values(ascending=False)
+            
+            fig_category_orders = px.bar(
+                x=category_orders.index,
+                y=category_orders.values,
+                title="Orders by Category",
+                labels={'x': 'Category', 'y': 'Number of Orders'},
+                color=category_orders.values,
+                color_continuous_scale='Blues'
+            )
+            fig_category_orders.update_xaxes(tickangle=45)
+            fig_category_orders.update_layout(height=400)
+            st.plotly_chart(fig_category_orders, use_container_width=True)
+        
+        # Row 2: Top Customers and Products
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("Top Customers by Revenue")
+            customer_revenue = filtered_data.groupby('CompanyName').apply(
+                lambda x: (x['UnitPrice'] * x['Quantity'] * (1 - x['Discount'])).sum()
+            ).sort_values(ascending=False).head(10)
+            
+            fig_customer_revenue = px.bar(
+                x=customer_revenue.values,
+                y=customer_revenue.index,
+                orientation='h',
+                title="Top 10 Customers by Revenue",
+                labels={'x': 'Revenue ($)', 'y': 'Customer'},
+                color=customer_revenue.values,
+                color_continuous_scale='Greens'
+            )
+            fig_customer_revenue.update_layout(height=400)
+            st.plotly_chart(fig_customer_revenue, use_container_width=True)
+        
+        with col2:
+            st.subheader("Top Products by Quantity")
+            product_quantity = filtered_data.groupby('ProductName')['Quantity'].sum().sort_values(ascending=False).head(10)
+            
+            fig_product_quantity = px.bar(
+                x=product_quantity.values,
+                y=product_quantity.index,
+                orientation='h',
+                title="Top 10 Products by Quantity Sold",
+                labels={'x': 'Quantity Sold', 'y': 'Product'},
+                color=product_quantity.values,
+                color_continuous_scale='Reds'
+            )
+            fig_product_quantity.update_layout(height=400)
+            st.plotly_chart(fig_product_quantity, use_container_width=True)
+        
+        # Row 3: Time Series and Employee Performance
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if 'ShippedDate' in filtered_data.columns:
+                st.subheader("Revenue Over Time")
+                filtered_data['ShippedDate'] = pd.to_datetime(filtered_data['ShippedDate'], errors='coerce')
+                daily_revenue = filtered_data.groupby(filtered_data['ShippedDate'].dt.date).apply(
+                    lambda x: (x['UnitPrice'] * x['Quantity'] * (1 - x['Discount'])).sum()
+                ).reset_index()
+                daily_revenue.columns = ['Date', 'Revenue']
+                
+                fig_time_revenue = px.line(
+                    daily_revenue,
+                    x='Date',
+                    y='Revenue',
+                    title="Daily Revenue Trend",
+                    labels={'Date': 'Date', 'Revenue': 'Revenue ($)'}
+                )
+                fig_time_revenue.update_layout(height=400)
+                st.plotly_chart(fig_time_revenue, use_container_width=True)
+        
+        with col2:
+            if 'EmployeeID' in filtered_data.columns:
+                st.subheader("Employee Performance")
+                employee_performance = filtered_data.groupby('EmployeeID').agg({
+                    'OrderID': 'nunique',
+                    'UnitPrice': lambda x: (x * filtered_data.loc[x.index, 'Quantity'] * (1 - filtered_data.loc[x.index, 'Discount'])).sum()
+                }).reset_index()
+                employee_performance.columns = ['EmployeeID', 'Orders', 'Revenue']
+                
+                fig_employee = px.scatter(
+                    employee_performance,
+                    x='Orders',
+                    y='Revenue',
+                    title="Employee Performance (Orders vs Revenue)",
+                    labels={'Orders': 'Number of Orders', 'Revenue': 'Revenue ($)'},
+                    size='Revenue',
+                    color='Orders',
+                    color_continuous_scale='Viridis'
+                )
+                fig_employee.update_layout(height=400)
+                st.plotly_chart(fig_employee, use_container_width=True)
+        
+        # Detailed Data Table
+        st.markdown("---")
+        st.header("📋 Detailed Data Table")
+        
+        # Search functionality
+        search_term = st.text_input("🔍 Search in all columns:", key="search_comprehensive")
+        
+        display_data = filtered_data.copy()
         if search_term:
-            search_mask = pd.DataFrame([display_df[col].astype(str).str.contains(search_term, case=False, na=False) 
-                                      for col in display_df.select_dtypes(include=['object']).columns]).any()
-            display_df = display_df[search_mask]
+            search_mask = pd.DataFrame([display_data[col].astype(str).str.contains(search_term, case=False, na=False) 
+                                      for col in display_data.select_dtypes(include=['object']).columns]).any()
+            display_data = display_data[search_mask]
         
-        if selected_key and selected_key != '':
-            display_df = display_df[display_df[key_col] == selected_key]
-        
-        # Display the filtered table
         st.dataframe(
-            display_df,
+            display_data,
             use_container_width=True,
             hide_index=True
         )
         
-        # Show related data when a specific record is selected
-        if selected_key and selected_key != '':
-            st.markdown("---")
-            st.subheader(f"🔗 Related Data for {key_col}: {selected_key}")
-            
-            # Show related data based on the selected table
-            if selected_table == 'Customers':
-                show_customer_relationships(data, selected_key)
-            elif selected_table == 'Orders':
-                show_order_relationships(data, selected_key)
-            elif selected_table == 'Products':
-                show_product_relationships(data, selected_key)
-            elif selected_table == 'Categories':
-                show_category_relationships(data, selected_key)
-            elif selected_table == 'Employees':
-                show_employee_relationships(data, selected_key)
+        # Download section
+        st.markdown("---")
+        st.header("💾 Export Data")
+        
+        csv_data = display_data.to_csv(index=False)
+        st.download_button(
+            label="📥 Download Comprehensive Data (CSV)",
+            data=csv_data,
+            file_name=f"comprehensive_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
+        
+    except Exception as e:
+        st.error(f"Error creating comprehensive dataset: {str(e)}")
+        st.info("Please ensure all required tables are available in your database.")
+
+def create_comprehensive_dataset(data):
+    """Create comprehensive dataset using your exact SQL query logic"""
+    try:
+        # Start with Orders and Order Details (RIGHT JOIN)
+        if data['orders'].empty or data['orderdetails'].empty:
+            return pd.DataFrame()
+        
+        # RIGHT JOIN Orders with Order Details
+        comprehensive = data['orderdetails'].merge(
+            data['orders'],
+            left_on='OrderID',
+            right_on='OrderID',
+            how='right'
+        )
+        
+        # LEFT JOIN with Products
+        if not data['products'].empty:
+            comprehensive = comprehensive.merge(
+                data['products'],
+                left_on='ProductID',
+                right_on='ProductID',
+                how='left'
+            )
+        
+        # JOIN with Customers
+        if not data['customers'].empty:
+            comprehensive = comprehensive.merge(
+                data['customers'],
+                left_on='CustomerID',
+                right_on='CustomerID',
+                how='inner'
+            )
+        
+        # JOIN with Categories
+        if not data['categories'].empty and 'CategoryID' in comprehensive.columns:
+            comprehensive = comprehensive.merge(
+                data['categories'],
+                left_on='CategoryID',
+                right_on='CategoryID',
+                how='inner'
+            )
+        
+        # JOIN with Employees
+        if not data['employees'].empty:
+            comprehensive = comprehensive.merge(
+                data['employees'],
+                left_on='EmployeeID',
+                right_on='EmployeeID',
+                how='inner'
+            )
+        
+        # Select and rename columns to match your query
+        columns_to_keep = [
+            'OrderID', 'ShippedDate', 'ShipName', 'ProductID', 'UnitPrice', 
+            'Quantity', 'Discount', 'CompanyName', 'CategoryName', 'ProductName', 
+            'CustomerID', 'EmployeeID'
+        ]
+        
+        # Keep only columns that exist
+        available_columns = [col for col in columns_to_keep if col in comprehensive.columns]
+        comprehensive = comprehensive[available_columns]
+        
+        return comprehensive
+        
+    except Exception as e:
+        st.error(f"Error in create_comprehensive_dataset: {str(e)}")
+        return pd.DataFrame()
 
 def show_customer_relationships(data, customer_id):
     """Show all data related to a specific customer"""
