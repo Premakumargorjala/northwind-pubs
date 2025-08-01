@@ -828,20 +828,27 @@ def data_relationships_page(data):
         st.success(f"✅ Loaded {len(comprehensive_data):,} comprehensive records")
         
         # Sidebar filters
-        st.sidebar.header("🔍 Data Filters")
+        st.sidebar.header("🔍 Interactive Filters")
+        
+        # OrderID filter
+        if 'OrderID' in comprehensive_data.columns:
+            order_ids = ['All'] + sorted(comprehensive_data['OrderID'].unique().tolist())
+            selected_order = st.sidebar.selectbox("Select OrderID:", order_ids)
         
         # Customer filter
-        customers = ['All'] + sorted(comprehensive_data['CompanyName'].unique().tolist())
-        selected_customer = st.sidebar.selectbox("Select Customer:", customers)
-        
-        # Category filter
-        categories = ['All'] + sorted(comprehensive_data['CategoryName'].unique().tolist())
-        selected_category = st.sidebar.selectbox("Select Category:", categories)
+        if 'CustomerCompany' in comprehensive_data.columns:
+            customers = ['All'] + sorted(comprehensive_data['CustomerCompany'].unique().tolist())
+            selected_customer = st.sidebar.selectbox("Select Customer:", customers)
         
         # Employee filter
         if 'EmployeeID' in comprehensive_data.columns:
             employees = ['All'] + sorted(comprehensive_data['EmployeeID'].unique().tolist())
-            selected_employee = st.sidebar.selectbox("Select Employee:", employees)
+            selected_employee = st.sidebar.selectbox("Select EmployeeID:", employees)
+        
+        # Category filter
+        if 'CategoryName' in comprehensive_data.columns:
+            categories = ['All'] + sorted(comprehensive_data['CategoryName'].unique().tolist())
+            selected_category = st.sidebar.selectbox("Select Category:", categories)
         
         # Date filter
         if 'ShippedDate' in comprehensive_data.columns:
@@ -860,14 +867,17 @@ def data_relationships_page(data):
         # Apply filters
         filtered_data = comprehensive_data.copy()
         
-        if selected_customer != 'All':
-            filtered_data = filtered_data[filtered_data['CompanyName'] == selected_customer]
+        if 'OrderID' in comprehensive_data.columns and selected_order != 'All':
+            filtered_data = filtered_data[filtered_data['OrderID'] == selected_order]
         
-        if selected_category != 'All':
-            filtered_data = filtered_data[filtered_data['CategoryName'] == selected_category]
+        if 'CustomerCompany' in comprehensive_data.columns and selected_customer != 'All':
+            filtered_data = filtered_data[filtered_data['CustomerCompany'] == selected_customer]
         
         if 'EmployeeID' in comprehensive_data.columns and selected_employee != 'All':
             filtered_data = filtered_data[filtered_data['EmployeeID'] == selected_employee]
+        
+        if 'CategoryName' in comprehensive_data.columns and selected_category != 'All':
+            filtered_data = filtered_data[filtered_data['CategoryName'] == selected_category]
         
         if 'ShippedDate' in comprehensive_data.columns and len(date_range) == 2:
             start_date, end_date = date_range
@@ -900,7 +910,7 @@ def data_relationships_page(data):
             """, unsafe_allow_html=True)
         
         with col3:
-            unique_customers = filtered_data['CompanyName'].nunique()
+            unique_customers = filtered_data['CustomerCompany'].nunique() if 'CustomerCompany' in filtered_data.columns else 0
             st.markdown(f"""
             <div class="metric-card">
                 <h3>Unique Customers</h3>
@@ -922,7 +932,39 @@ def data_relationships_page(data):
         # Visualizations
         st.header("📊 Data Visualizations")
         
-        # Row 1: Revenue and Orders by Category
+        # Row 1: Quantity by Category and Orders by Customer
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("Quantity Ordered per Category")
+            category_quantity = filtered_data.groupby('CategoryName')['Quantity'].sum().sort_values(ascending=False)
+            
+            fig_category_quantity = px.bar(
+                x=category_quantity.index,
+                y=category_quantity.values,
+                title="Quantity Ordered per Category",
+                labels={'x': 'Category', 'y': 'Total Quantity'},
+                color=category_quantity.values,
+                color_continuous_scale='Blues'
+            )
+            fig_category_quantity.update_xaxes(tickangle=45)
+            fig_category_quantity.update_layout(height=400)
+            st.plotly_chart(fig_category_quantity, use_container_width=True)
+        
+        with col2:
+            st.subheader("Orders by Customer")
+            customer_orders = filtered_data.groupby('CustomerCompany')['OrderID'].nunique().sort_values(ascending=False).head(10)
+            
+            fig_customer_orders = px.pie(
+                values=customer_orders.values,
+                names=customer_orders.index,
+                title="Top 10 Customers by Order Count",
+                hole=0.3
+            )
+            fig_customer_orders.update_layout(height=400)
+            st.plotly_chart(fig_customer_orders, use_container_width=True)
+        
+        # Row 2: Revenue by Category and Discounts by Product
         col1, col2 = st.columns(2)
         
         with col1:
@@ -941,57 +983,20 @@ def data_relationships_page(data):
             st.plotly_chart(fig_category_revenue, use_container_width=True)
         
         with col2:
-            st.subheader("Orders by Category")
-            category_orders = filtered_data.groupby('CategoryName')['OrderID'].nunique().sort_values(ascending=False)
+            st.subheader("Average Discounts by Product")
+            product_discounts = filtered_data.groupby('ProductName')['Discount'].mean().sort_values(ascending=False).head(10)
             
-            fig_category_orders = px.bar(
-                x=category_orders.index,
-                y=category_orders.values,
-                title="Orders by Category",
-                labels={'x': 'Category', 'y': 'Number of Orders'},
-                color=category_orders.values,
-                color_continuous_scale='Blues'
-            )
-            fig_category_orders.update_xaxes(tickangle=45)
-            fig_category_orders.update_layout(height=400)
-            st.plotly_chart(fig_category_orders, use_container_width=True)
-        
-        # Row 2: Top Customers and Products
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("Top Customers by Revenue")
-            customer_revenue = filtered_data.groupby('CompanyName').apply(
-                lambda x: (x['UnitPrice'] * x['Quantity'] * (1 - x['Discount'])).sum()
-            ).sort_values(ascending=False).head(10)
-            
-            fig_customer_revenue = px.bar(
-                x=customer_revenue.values,
-                y=customer_revenue.index,
+            fig_product_discounts = px.bar(
+                x=product_discounts.values,
+                y=product_discounts.index,
                 orientation='h',
-                title="Top 10 Customers by Revenue",
-                labels={'x': 'Revenue ($)', 'y': 'Customer'},
-                color=customer_revenue.values,
-                color_continuous_scale='Greens'
-            )
-            fig_customer_revenue.update_layout(height=400)
-            st.plotly_chart(fig_customer_revenue, use_container_width=True)
-        
-        with col2:
-            st.subheader("Top Products by Quantity")
-            product_quantity = filtered_data.groupby('ProductName')['Quantity'].sum().sort_values(ascending=False).head(10)
-            
-            fig_product_quantity = px.bar(
-                x=product_quantity.values,
-                y=product_quantity.index,
-                orientation='h',
-                title="Top 10 Products by Quantity Sold",
-                labels={'x': 'Quantity Sold', 'y': 'Product'},
-                color=product_quantity.values,
+                title="Top 10 Products by Average Discount",
+                labels={'x': 'Average Discount', 'y': 'Product'},
+                color=product_discounts.values,
                 color_continuous_scale='Reds'
             )
-            fig_product_quantity.update_layout(height=400)
-            st.plotly_chart(fig_product_quantity, use_container_width=True)
+            fig_product_discounts.update_layout(height=400)
+            st.plotly_chart(fig_product_discounts, use_container_width=True)
         
         # Row 3: Time Series and Employee Performance
         col1, col2 = st.columns(2)
@@ -1016,24 +1021,27 @@ def data_relationships_page(data):
                 st.plotly_chart(fig_time_revenue, use_container_width=True)
         
         with col2:
-            if 'EmployeeID' in filtered_data.columns:
+            if 'EmployeeID' in filtered_data.columns and 'FirstName' in filtered_data.columns and 'LastName' in filtered_data.columns:
                 st.subheader("Employee Performance")
-                employee_performance = filtered_data.groupby('EmployeeID').agg({
+                # Create employee full name
+                filtered_data['EmployeeName'] = filtered_data['FirstName'] + ' ' + filtered_data['LastName']
+                
+                employee_performance = filtered_data.groupby('EmployeeName').agg({
                     'OrderID': 'nunique',
                     'UnitPrice': lambda x: (x * filtered_data.loc[x.index, 'Quantity'] * (1 - filtered_data.loc[x.index, 'Discount'])).sum()
                 }).reset_index()
-                employee_performance.columns = ['EmployeeID', 'Orders', 'Revenue']
+                employee_performance.columns = ['EmployeeName', 'Orders', 'Revenue']
                 
-                fig_employee = px.scatter(
+                fig_employee = px.bar(
                     employee_performance,
-                    x='Orders',
+                    x='EmployeeName',
                     y='Revenue',
-                    title="Employee Performance (Orders vs Revenue)",
-                    labels={'Orders': 'Number of Orders', 'Revenue': 'Revenue ($)'},
-                    size='Revenue',
+                    title="Employee Performance by Revenue",
+                    labels={'EmployeeName': 'Employee', 'Revenue': 'Revenue ($)'},
                     color='Orders',
                     color_continuous_scale='Viridis'
                 )
+                fig_employee.update_xaxes(tickangle=45)
                 fig_employee.update_layout(height=400)
                 st.plotly_chart(fig_employee, use_container_width=True)
         
@@ -1123,16 +1131,20 @@ def create_comprehensive_dataset(data):
                 how='inner'
             )
         
-        # Select and rename columns to match your query
+        # Select and rename columns to match your exact SQL query
         columns_to_keep = [
             'OrderID', 'ShippedDate', 'ShipName', 'ProductID', 'UnitPrice', 
             'Quantity', 'Discount', 'CompanyName', 'CategoryName', 'ProductName', 
-            'CustomerID', 'EmployeeID'
+            'CustomerID', 'EmployeeID', 'FirstName', 'LastName'
         ]
         
-        # Keep only columns that exist
+        # Keep only columns that exist and rename CompanyName to CustomerCompany
         available_columns = [col for col in columns_to_keep if col in comprehensive.columns]
         comprehensive = comprehensive[available_columns]
+        
+        # Rename CompanyName to CustomerCompany to match your query
+        if 'CompanyName' in comprehensive.columns:
+            comprehensive = comprehensive.rename(columns={'CompanyName': 'CustomerCompany'})
         
         return comprehensive
         
