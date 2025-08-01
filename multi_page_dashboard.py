@@ -820,19 +820,48 @@ def data_relationships_page(data):
     # Sidebar Filters
     st.sidebar.header("🔍 Sidebar Filters")
     
-    # Get unique values for filters
-    order_ids = ['All'] + sorted(data['orders']['OrderID'].unique().tolist()) if not data['orders'].empty else ['All']
-    customer_ids = ['All'] + sorted(data['customers']['CustomerID'].unique().tolist()) if not data['customers'].empty else ['All']
-    employee_ids = ['All'] + sorted(data['employees']['EmployeeID'].unique().tolist()) if not data['employees'].empty else ['All']
-    product_ids = ['All'] + sorted(data['products']['ProductID'].unique().tolist()) if not data['products'].empty else ['All']
-    category_ids = ['All'] + sorted(data['categories']['CategoryID'].unique().tolist()) if not data['categories'].empty else ['All']
+    # Get unique values for filters with names instead of IDs
+    if not data['orders'].empty:
+        order_options = ['All'] + [f"Order #{order_id}" for order_id in sorted(data['orders']['OrderID'].unique())]
+        order_id_map = {f"Order #{order_id}": order_id for order_id in data['orders']['OrderID'].unique()}
+    else:
+        order_options = ['All']
+        order_id_map = {}
     
-    # Filter dropdowns
-    selected_order = st.sidebar.selectbox("📦 OrderID (from Orders):", order_ids)
-    selected_customer = st.sidebar.selectbox("👤 CustomerID (from Customers):", customer_ids)
-    selected_employee = st.sidebar.selectbox("👨‍💼 EmployeeID (from Employees):", employee_ids)
-    selected_product = st.sidebar.selectbox("📦 ProductID (from Products):", product_ids)
-    selected_category = st.sidebar.selectbox("🏷️ CategoryID (from Categories):", category_ids)
+    if not data['customers'].empty:
+        customer_options = ['All'] + [f"{row['CompanyName']} ({row['CustomerID']})" for _, row in data['customers'].iterrows()]
+        customer_id_map = {f"{row['CompanyName']} ({row['CustomerID']})": row['CustomerID'] for _, row in data['customers'].iterrows()}
+    else:
+        customer_options = ['All']
+        customer_id_map = {}
+    
+    if not data['employees'].empty:
+        employee_options = ['All'] + [f"{row['FirstName']} {row['LastName']} ({row['EmployeeID']})" for _, row in data['employees'].iterrows()]
+        employee_id_map = {f"{row['FirstName']} {row['LastName']} ({row['EmployeeID']})": row['EmployeeID'] for _, row in data['employees'].iterrows()}
+    else:
+        employee_options = ['All']
+        employee_id_map = {}
+    
+    if not data['products'].empty:
+        product_options = ['All'] + [f"{row['ProductName']} ({row['ProductID']})" for _, row in data['products'].iterrows()]
+        product_id_map = {f"{row['ProductName']} ({row['ProductID']})": row['ProductID'] for _, row in data['products'].iterrows()}
+    else:
+        product_options = ['All']
+        product_id_map = {}
+    
+    if not data['categories'].empty:
+        category_options = ['All'] + [f"{row['CategoryName']} ({row['CategoryID']})" for _, row in data['categories'].iterrows()]
+        category_id_map = {f"{row['CategoryName']} ({row['CategoryID']})": row['CategoryID'] for _, row in data['categories'].iterrows()}
+    else:
+        category_options = ['All']
+        category_id_map = {}
+    
+    # Filter dropdowns with user-friendly names
+    selected_order = st.sidebar.selectbox("📦 Order Number:", order_options)
+    selected_customer = st.sidebar.selectbox("👤 Customer Name:", customer_options)
+    selected_employee = st.sidebar.selectbox("👨‍💼 Employee Name:", employee_options)
+    selected_product = st.sidebar.selectbox("📦 Product Name:", product_options)
+    selected_category = st.sidebar.selectbox("🏷️ Category Name:", category_options)
     
     # Date Range Filter
     if not data['orders'].empty and 'OrderDate' in data['orders'].columns:
@@ -856,26 +885,41 @@ def data_relationships_page(data):
     active_filter = None
     if selected_order != 'All':
         active_filter = 'OrderID'
-        filter_value = selected_order
+        filter_value = order_id_map.get(selected_order, selected_order)
     elif selected_customer != 'All':
         active_filter = 'CustomerID'
-        filter_value = selected_customer
+        filter_value = customer_id_map.get(selected_customer, selected_customer)
     elif selected_employee != 'All':
         active_filter = 'EmployeeID'
-        filter_value = selected_employee
+        filter_value = employee_id_map.get(selected_employee, selected_employee)
     elif selected_product != 'All':
         active_filter = 'ProductID'
-        filter_value = selected_product
+        filter_value = product_id_map.get(selected_product, selected_product)
     elif selected_category != 'All':
         active_filter = 'CategoryID'
-        filter_value = selected_category
+        filter_value = category_id_map.get(selected_category, selected_category)
     elif date_range and len(date_range) == 2:
         active_filter = 'DateRange'
         filter_value = date_range
     
     # Main content area
     if active_filter:
-        st.header(f"📊 Detailed Analysis for {active_filter}: {filter_value}")
+        # Get display name for the selected filter
+        display_name = filter_value
+        if active_filter == 'OrderID' and selected_order != 'All':
+            display_name = selected_order
+        elif active_filter == 'CustomerID' and selected_customer != 'All':
+            display_name = selected_customer
+        elif active_filter == 'EmployeeID' and selected_employee != 'All':
+            display_name = selected_employee
+        elif active_filter == 'ProductID' and selected_product != 'All':
+            display_name = selected_product
+        elif active_filter == 'CategoryID' and selected_category != 'All':
+            display_name = selected_category
+        elif active_filter == 'DateRange':
+            display_name = f"{date_range[0]} to {date_range[1]}"
+        
+        st.header(f"📊 Detailed Analysis for {active_filter}: {display_name}")
         
         # Create tabs for organized display
         tab1, tab2, tab3, tab4 = st.tabs(["📋 Related Data", "📈 Analytics", "📊 Charts", "💾 Export"])
@@ -1440,68 +1484,641 @@ def show_analytics_for_filter(data, active_filter, filter_value):
                 st.metric("Discontinued Products", len(category_products[category_products['Discontinued'] == True]))
 
 def show_charts_for_filter(data, active_filter, filter_value):
-    """Show interactive charts for the selected filter"""
+    """Show beautiful and informative interactive charts for the selected filter"""
+    
+    # Custom color schemes for better visual appeal
+    colors = px.colors.qualitative.Set3
+    sequential_colors = px.colors.sequential.Viridis
+    
     if active_filter == 'CustomerID':
         # Customer charts
         customer_orders = data['orders'][data['orders']['CustomerID'] == filter_value]
         if not customer_orders.empty:
+            st.subheader("📈 Customer Order Analysis")
+            
             col1, col2 = st.columns(2)
             
             with col1:
-                # Orders over time
+                # Enhanced Orders over time with better styling
                 if 'OrderDate' in customer_orders.columns:
                     customer_orders['OrderDate'] = pd.to_datetime(customer_orders['OrderDate'], errors='coerce')
-                    orders_by_date = customer_orders.groupby(customer_orders['OrderDate'].dt.date).size().reset_index(name='count')
-                    fig = px.line(orders_by_date, x='OrderDate', y='count', title="Orders Over Time")
+                    orders_by_date = customer_orders.groupby(customer_orders['OrderDate'].dt.date).size().reset_index(name='Orders')
+                    orders_by_date['OrderDate'] = pd.to_datetime(orders_by_date['OrderDate'])
+                    
+                    fig = px.line(
+                        orders_by_date, 
+                        x='OrderDate', 
+                        y='Orders',
+                        title="📅 Customer Order Timeline",
+                        labels={'Orders': 'Number of Orders', 'OrderDate': 'Date'},
+                        line_shape='spline',
+                        markers=True
+                    )
+                    fig.update_layout(
+                        plot_bgcolor='white',
+                        paper_bgcolor='white',
+                        font=dict(size=12),
+                        title_font_size=16,
+                        title_font_color='#2E86AB'
+                    )
+                    fig.update_traces(line_color='#2E86AB', line_width=3, marker_size=8)
                     st.plotly_chart(fig, use_container_width=True)
             
             with col2:
-                # Orders by ship country
+                # Enhanced Orders by ship country with better styling
                 country_counts = customer_orders['ShipCountry'].value_counts()
-                fig = px.pie(values=country_counts.values, names=country_counts.index, title="Orders by Ship Country")
+                fig = px.pie(
+                    values=country_counts.values, 
+                    names=country_counts.index, 
+                    title="🌍 Orders by Ship Country",
+                    color_discrete_sequence=colors
+                )
+                fig.update_layout(
+                    title_font_size=16,
+                    title_font_color='#2E86AB',
+                    showlegend=True,
+                    legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1.02)
+                )
+                fig.update_traces(textposition='inside', textinfo='percent+label')
                 st.plotly_chart(fig, use_container_width=True)
+            
+            # Additional customer insights
+            col3, col4 = st.columns(2)
+            
+            with col3:
+                # Customer order value distribution
+                if not data['orderdetails'].empty:
+                    customer_order_ids = customer_orders['OrderID'].tolist()
+                    customer_order_details = data['orderdetails'][data['orderdetails']['OrderID'].isin(customer_order_ids)]
+                    if not customer_order_details.empty:
+                        customer_order_details['OrderValue'] = customer_order_details['UnitPrice'] * customer_order_details['Quantity']
+                        order_values = customer_order_details.groupby('OrderID')['OrderValue'].sum()
+                        
+                        fig = px.histogram(
+                            x=order_values.values,
+                            title="💰 Order Value Distribution",
+                            labels={'x': 'Order Value ($)', 'y': 'Number of Orders'},
+                            nbins=10,
+                            color_discrete_sequence=['#FF6B6B']
+                        )
+                        fig.update_layout(
+                            plot_bgcolor='white',
+                            paper_bgcolor='white',
+                            title_font_size=16,
+                            title_font_color='#2E86AB'
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+            
+            with col4:
+                # Monthly order pattern
+                if 'OrderDate' in customer_orders.columns:
+                    customer_orders['Month'] = customer_orders['OrderDate'].dt.month
+                    customer_orders['MonthName'] = customer_orders['OrderDate'].dt.strftime('%B')
+                    monthly_orders = customer_orders.groupby(['Month', 'MonthName']).size().reset_index(name='Orders')
+                    monthly_orders = monthly_orders.sort_values('Month')
+                    
+                    fig = px.bar(
+                        monthly_orders,
+                        x='MonthName',
+                        y='Orders',
+                        title="📊 Monthly Order Pattern",
+                        color='Orders',
+                        color_continuous_scale='Blues'
+                    )
+                    fig.update_layout(
+                        plot_bgcolor='white',
+                        paper_bgcolor='white',
+                        title_font_size=16,
+                        title_font_color='#2E86AB',
+                        xaxis_title="Month",
+                        yaxis_title="Number of Orders"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
     
     elif active_filter == 'EmployeeID':
         # Employee charts
         employee_orders = data['orders'][data['orders']['EmployeeID'] == filter_value]
         if not employee_orders.empty:
+            st.subheader("👨‍💼 Employee Performance Analysis")
+            
             col1, col2 = st.columns(2)
             
             with col1:
-                # Orders by customer
+                # Enhanced Top customers with better styling
                 customer_counts = employee_orders['CustomerID'].value_counts().head(10)
-                fig = px.bar(x=customer_counts.index, y=customer_counts.values, title="Top 10 Customers")
+                customer_df = pd.DataFrame({
+                    'Customer': customer_counts.index,
+                    'Orders': customer_counts.values
+                })
+                
+                fig = px.bar(
+                    customer_df,
+                    x='Orders',
+                    y='Customer',
+                    orientation='h',
+                    title="🏆 Top 10 Customers Served",
+                    color='Orders',
+                    color_continuous_scale='Greens'
+                )
+                fig.update_layout(
+                    plot_bgcolor='white',
+                    paper_bgcolor='white',
+                    title_font_size=16,
+                    title_font_color='#2E86AB',
+                    xaxis_title="Number of Orders",
+                    yaxis_title="Customer ID"
+                )
                 st.plotly_chart(fig, use_container_width=True)
             
             with col2:
-                # Orders by ship country
+                # Enhanced Orders by ship country
                 country_counts = employee_orders['ShipCountry'].value_counts()
-                fig = px.pie(values=country_counts.values, names=country_counts.index, title="Orders by Ship Country")
+                fig = px.pie(
+                    values=country_counts.values, 
+                    names=country_counts.index, 
+                    title="🌍 Orders by Ship Country",
+                    color_discrete_sequence=colors
+                )
+                fig.update_layout(
+                    title_font_size=16,
+                    title_font_color='#2E86AB',
+                    showlegend=True,
+                    legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1.02)
+                )
+                fig.update_traces(textposition='inside', textinfo='percent+label')
                 st.plotly_chart(fig, use_container_width=True)
+            
+            # Additional employee insights
+            col3, col4 = st.columns(2)
+            
+            with col3:
+                # Employee performance over time
+                if 'OrderDate' in employee_orders.columns:
+                    employee_orders['OrderDate'] = pd.to_datetime(employee_orders['OrderDate'], errors='coerce')
+                    performance_by_date = employee_orders.groupby(employee_orders['OrderDate'].dt.date).size().reset_index(name='Orders')
+                    performance_by_date['OrderDate'] = pd.to_datetime(performance_by_date['OrderDate'])
+                    
+                    fig = px.line(
+                        performance_by_date,
+                        x='OrderDate',
+                        y='Orders',
+                        title="📈 Employee Performance Timeline",
+                        labels={'Orders': 'Orders Handled', 'OrderDate': 'Date'},
+                        line_shape='spline',
+                        markers=True
+                    )
+                    fig.update_layout(
+                        plot_bgcolor='white',
+                        paper_bgcolor='white',
+                        title_font_size=16,
+                        title_font_color='#2E86AB'
+                    )
+                    fig.update_traces(line_color='#4ECDC4', line_width=3, marker_size=8)
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            with col4:
+                # Revenue generated by employee
+                if not data['orderdetails'].empty:
+                    employee_order_ids = employee_orders['OrderID'].tolist()
+                    employee_order_details = data['orderdetails'][data['orderdetails']['OrderID'].isin(employee_order_ids)]
+                    if not employee_order_details.empty:
+                        employee_order_details['Revenue'] = employee_order_details['UnitPrice'] * employee_order_details['Quantity']
+                        monthly_revenue = employee_order_details.merge(
+                            employee_orders[['OrderID', 'OrderDate']], on='OrderID', how='left'
+                        )
+                        monthly_revenue['Month'] = pd.to_datetime(monthly_revenue['OrderDate']).dt.strftime('%Y-%m')
+                        revenue_by_month = monthly_revenue.groupby('Month')['Revenue'].sum().reset_index()
+                        
+                        fig = px.bar(
+                            revenue_by_month,
+                            x='Month',
+                            y='Revenue',
+                            title="💰 Monthly Revenue Generated",
+                            color='Revenue',
+                            color_continuous_scale='Viridis'
+                        )
+                        fig.update_layout(
+                            plot_bgcolor='white',
+                            paper_bgcolor='white',
+                            title_font_size=16,
+                            title_font_color='#2E86AB',
+                            xaxis_title="Month",
+                            yaxis_title="Revenue ($)"
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
     
     elif active_filter == 'ProductID':
         # Product charts
         product_orders = data['orderdetails'][data['orderdetails']['ProductID'] == filter_value]
         if not product_orders.empty:
+            st.subheader("📦 Product Performance Analysis")
+            
             col1, col2 = st.columns(2)
             
             with col1:
-                # Quantity sold over time (if order dates available)
+                # Enhanced Quantity sold over time
                 if not data['orders'].empty:
                     order_dates = data['orders'][['OrderID', 'OrderDate']]
                     product_with_dates = product_orders.merge(order_dates, on='OrderID', how='left')
                     if 'OrderDate' in product_with_dates.columns:
                         product_with_dates['OrderDate'] = pd.to_datetime(product_with_dates['OrderDate'], errors='coerce')
                         quantity_by_date = product_with_dates.groupby(product_with_dates['OrderDate'].dt.date)['Quantity'].sum().reset_index()
-                        fig = px.line(quantity_by_date, x='OrderDate', y='Quantity', title="Quantity Sold Over Time")
+                        quantity_by_date['OrderDate'] = pd.to_datetime(quantity_by_date['OrderDate'])
+                        
+                        fig = px.line(
+                            quantity_by_date,
+                            x='OrderDate',
+                            y='Quantity',
+                            title="📈 Product Sales Timeline",
+                            labels={'Quantity': 'Quantity Sold', 'OrderDate': 'Date'},
+                            line_shape='spline',
+                            markers=True
+                        )
+                        fig.update_layout(
+                            plot_bgcolor='white',
+                            paper_bgcolor='white',
+                            title_font_size=16,
+                            title_font_color='#2E86AB'
+                        )
+                        fig.update_traces(line_color='#FF6B6B', line_width=3, marker_size=8)
                         st.plotly_chart(fig, use_container_width=True)
             
             with col2:
-                # Revenue by order
+                # Enhanced Revenue by order
                 product_orders['Revenue'] = product_orders['UnitPrice'] * product_orders['Quantity']
                 revenue_by_order = product_orders.groupby('OrderID')['Revenue'].sum().sort_values(ascending=False).head(10)
-                fig = px.bar(x=revenue_by_order.index, y=revenue_by_order.values, title="Top 10 Orders by Revenue")
+                revenue_df = pd.DataFrame({
+                    'Order': [f"Order #{order_id}" for order_id in revenue_by_order.index],
+                    'Revenue': revenue_by_order.values
+                })
+                
+                fig = px.bar(
+                    revenue_df,
+                    x='Revenue',
+                    y='Order',
+                    orientation='h',
+                    title="💰 Top 10 Orders by Revenue",
+                    color='Revenue',
+                    color_continuous_scale='Reds'
+                )
+                fig.update_layout(
+                    plot_bgcolor='white',
+                    paper_bgcolor='white',
+                    title_font_size=16,
+                    title_font_color='#2E86AB',
+                    xaxis_title="Revenue ($)",
+                    yaxis_title="Order ID"
+                )
                 st.plotly_chart(fig, use_container_width=True)
+            
+            # Additional product insights
+            col3, col4 = st.columns(2)
+            
+            with col3:
+                # Product discount analysis
+                if 'Discount' in product_orders.columns:
+                    discount_analysis = product_orders.groupby('Discount')['Quantity'].sum().reset_index()
+                    fig = px.pie(
+                        values=discount_analysis['Quantity'],
+                        names=[f"{disc*100:.0f}%" if disc > 0 else "No Discount" for disc in discount_analysis['Discount']],
+                        title="🎯 Sales by Discount Level",
+                        color_discrete_sequence=colors
+                    )
+                    fig.update_layout(
+                        title_font_size=16,
+                        title_font_color='#2E86AB',
+                        showlegend=True
+                    )
+                    fig.update_traces(textposition='inside', textinfo='percent+label')
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            with col4:
+                # Product unit price vs quantity scatter
+                fig = px.scatter(
+                    product_orders,
+                    x='UnitPrice',
+                    y='Quantity',
+                    title="📊 Price vs Quantity Analysis",
+                    labels={'UnitPrice': 'Unit Price ($)', 'Quantity': 'Quantity Sold'},
+                    size='Quantity',
+                    color='Quantity',
+                    color_continuous_scale='Blues'
+                )
+                fig.update_layout(
+                    plot_bgcolor='white',
+                    paper_bgcolor='white',
+                    title_font_size=16,
+                    title_font_color='#2E86AB'
+                )
+                                        st.plotly_chart(fig, use_container_width=True)
+    
+    elif active_filter == 'OrderID':
+        # Order charts
+        order_details = data['orderdetails'][data['orderdetails']['OrderID'] == filter_value]
+        if not order_details.empty:
+            st.subheader("📦 Order Analysis")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Products in order by quantity
+                fig = px.bar(
+                    order_details,
+                    x='ProductID',
+                    y='Quantity',
+                    title="📊 Products in Order",
+                    labels={'Quantity': 'Quantity', 'ProductID': 'Product ID'},
+                    color='Quantity',
+                    color_continuous_scale='Blues'
+                )
+                fig.update_layout(
+                    plot_bgcolor='white',
+                    paper_bgcolor='white',
+                    title_font_size=16,
+                    title_font_color='#2E86AB',
+                    xaxis_title="Product ID",
+                    yaxis_title="Quantity"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                # Products by unit price
+                fig = px.pie(
+                    values=order_details['UnitPrice'],
+                    names=[f"Product {pid}" for pid in order_details['ProductID']],
+                    title="💰 Product Price Distribution",
+                    color_discrete_sequence=colors
+                )
+                fig.update_layout(
+                    title_font_size=16,
+                    title_font_color='#2E86AB',
+                    showlegend=True,
+                    legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1.02)
+                )
+                fig.update_traces(textposition='inside', textinfo='percent+label')
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Additional order insights
+            col3, col4 = st.columns(2)
+            
+            with col3:
+                # Order value breakdown
+                order_details['ItemValue'] = order_details['UnitPrice'] * order_details['Quantity']
+                total_order_value = order_details['ItemValue'].sum()
+                
+                fig = px.bar(
+                    x=['Total Order Value'],
+                    y=[total_order_value],
+                    title="💰 Total Order Value",
+                    labels={'x': 'Metric', 'y': 'Value ($)'},
+                    color=['Total Order Value'],
+                    color_discrete_sequence=['#FF6B6B']
+                )
+                fig.update_layout(
+                    plot_bgcolor='white',
+                    paper_bgcolor='white',
+                    title_font_size=16,
+                    title_font_color='#2E86AB',
+                    xaxis_title="Metric",
+                    yaxis_title="Value ($)"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col4:
+                # Discount analysis
+                if 'Discount' in order_details.columns:
+                    discount_analysis = order_details.groupby('Discount')['Quantity'].sum().reset_index()
+                    fig = px.pie(
+                        values=discount_analysis['Quantity'],
+                        names=[f"{disc*100:.0f}%" if disc > 0 else "No Discount" for disc in discount_analysis['Discount']],
+                        title="🎯 Quantity by Discount Level",
+                        color_discrete_sequence=colors
+                    )
+                    fig.update_layout(
+                        title_font_size=16,
+                        title_font_color='#2E86AB',
+                        showlegend=True
+                    )
+                    fig.update_traces(textposition='inside', textinfo='percent+label')
+                    st.plotly_chart(fig, use_container_width=True)
+    
+    elif active_filter == 'CategoryID':
+        # Category charts
+        category_products = data['products'][data['products']['CategoryID'] == filter_value]
+        if not category_products.empty:
+            st.subheader("🏷️ Category Performance Analysis")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Products in category by price
+                fig = px.bar(
+                    category_products,
+                    x='ProductName',
+                    y='UnitPrice',
+                    title="💰 Product Prices in Category",
+                    labels={'UnitPrice': 'Unit Price ($)', 'ProductName': 'Product'},
+                    color='UnitPrice',
+                    color_continuous_scale='Greens'
+                )
+                fig.update_layout(
+                    plot_bgcolor='white',
+                    paper_bgcolor='white',
+                    title_font_size=16,
+                    title_font_color='#2E86AB',
+                    xaxis_title="Product Name",
+                    yaxis_title="Unit Price ($)",
+                    xaxis_tickangle=-45
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                # Products by units in stock
+                fig = px.pie(
+                    values=category_products['UnitsInStock'],
+                    names=category_products['ProductName'],
+                    title="📦 Stock Distribution",
+                    color_discrete_sequence=colors
+                )
+                fig.update_layout(
+                    title_font_size=16,
+                    title_font_color='#2E86AB',
+                    showlegend=True,
+                    legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1.02)
+                )
+                fig.update_traces(textposition='inside', textinfo='percent+label')
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Additional category insights
+            col3, col4 = st.columns(2)
+            
+            with col3:
+                # Category sales performance (if order details available)
+                if not data['orderdetails'].empty:
+                    category_product_ids = category_products['ProductID'].tolist()
+                    category_sales = data['orderdetails'][data['orderdetails']['ProductID'].isin(category_product_ids)]
+                    if not category_sales.empty:
+                        category_sales['Revenue'] = category_sales['UnitPrice'] * category_sales['Quantity']
+                        product_sales = category_sales.groupby('ProductID')['Revenue'].sum().reset_index()
+                        product_sales = product_sales.merge(category_products[['ProductID', 'ProductName']], on='ProductID', how='left')
+                        
+                        fig = px.bar(
+                            product_sales,
+                            x='ProductName',
+                            y='Revenue',
+                            title="💵 Product Revenue in Category",
+                            labels={'Revenue': 'Revenue ($)', 'ProductName': 'Product'},
+                            color='Revenue',
+                            color_continuous_scale='Purples'
+                        )
+                        fig.update_layout(
+                            plot_bgcolor='white',
+                            paper_bgcolor='white',
+                            title_font_size=16,
+                            title_font_color='#2E86AB',
+                            xaxis_title="Product Name",
+                            yaxis_title="Revenue ($)",
+                            xaxis_tickangle=-45
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+            
+            with col4:
+                # Category product count vs average price
+                avg_price = category_products['UnitPrice'].mean()
+                total_products = len(category_products)
+                
+                fig = px.bar(
+                    x=['Average Price', 'Total Products'],
+                    y=[avg_price, total_products],
+                    title="📊 Category Summary",
+                    labels={'x': 'Metric', 'y': 'Value'},
+                    color=['Average Price', 'Total Products'],
+                    color_discrete_sequence=['#FF6B6B', '#4ECDC4']
+                )
+                fig.update_layout(
+                    plot_bgcolor='white',
+                    paper_bgcolor='white',
+                    title_font_size=16,
+                    title_font_color='#2E86AB',
+                    xaxis_title="Metric",
+                    yaxis_title="Value"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+    
+    elif active_filter == 'DateRange':
+        # Date range charts
+        start_date, end_date = filter_value
+        if not data['orders'].empty and 'OrderDate' in data['orders'].columns:
+            data['orders']['OrderDate'] = pd.to_datetime(data['orders']['OrderDate'], errors='coerce')
+            date_filtered_orders = data['orders'][
+                (data['orders']['OrderDate'].dt.date >= start_date) &
+                (data['orders']['OrderDate'].dt.date <= end_date)
+            ]
+            
+            if not date_filtered_orders.empty:
+                st.subheader("📅 Date Range Analysis")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Orders over time in date range
+                    orders_by_date = date_filtered_orders.groupby(date_filtered_orders['OrderDate'].dt.date).size().reset_index(name='Orders')
+                    orders_by_date['OrderDate'] = pd.to_datetime(orders_by_date['OrderDate'])
+                    
+                    fig = px.line(
+                        orders_by_date,
+                        x='OrderDate',
+                        y='Orders',
+                        title="📈 Orders Timeline",
+                        labels={'Orders': 'Number of Orders', 'OrderDate': 'Date'},
+                        line_shape='spline',
+                        markers=True
+                    )
+                    fig.update_layout(
+                        plot_bgcolor='white',
+                        paper_bgcolor='white',
+                        title_font_size=16,
+                        title_font_color='#2E86AB'
+                    )
+                    fig.update_traces(line_color='#2E86AB', line_width=3, marker_size=8)
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    # Orders by ship country in date range
+                    country_counts = date_filtered_orders['ShipCountry'].value_counts()
+                    fig = px.pie(
+                        values=country_counts.values,
+                        names=country_counts.index,
+                        title="🌍 Orders by Country",
+                        color_discrete_sequence=colors
+                    )
+                    fig.update_layout(
+                        title_font_size=16,
+                        title_font_color='#2E86AB',
+                        showlegend=True,
+                        legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1.02)
+                    )
+                    fig.update_traces(textposition='inside', textinfo='percent+label')
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                # Additional date range insights
+                col3, col4 = st.columns(2)
+                
+                with col3:
+                    # Daily order distribution
+                    date_filtered_orders['DayOfWeek'] = date_filtered_orders['OrderDate'].dt.day_name()
+                    day_counts = date_filtered_orders['DayOfWeek'].value_counts()
+                    day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                    day_counts = day_counts.reindex([day for day in day_order if day in day_counts.index])
+                    
+                    fig = px.bar(
+                        x=day_counts.index,
+                        y=day_counts.values,
+                        title="📊 Orders by Day of Week",
+                        labels={'x': 'Day of Week', 'y': 'Number of Orders'},
+                        color=day_counts.values,
+                        color_continuous_scale='Blues'
+                    )
+                    fig.update_layout(
+                        plot_bgcolor='white',
+                        paper_bgcolor='white',
+                        title_font_size=16,
+                        title_font_color='#2E86AB',
+                        xaxis_title="Day of Week",
+                        yaxis_title="Number of Orders"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with col4:
+                    # Revenue analysis for date range
+                    if not data['orderdetails'].empty:
+                        date_order_ids = date_filtered_orders['OrderID'].tolist()
+                        date_order_details = data['orderdetails'][data['orderdetails']['OrderID'].isin(date_order_ids)]
+                        if not date_order_details.empty:
+                            date_order_details['Revenue'] = date_order_details['UnitPrice'] * date_order_details['Quantity']
+                            daily_revenue = date_order_details.merge(
+                                date_filtered_orders[['OrderID', 'OrderDate']], on='OrderID', how='left'
+                            )
+                            daily_revenue = daily_revenue.groupby(daily_revenue['OrderDate'].dt.date)['Revenue'].sum().reset_index()
+                            daily_revenue['OrderDate'] = pd.to_datetime(daily_revenue['OrderDate'])
+                            
+                            fig = px.line(
+                                daily_revenue,
+                                x='OrderDate',
+                                y='Revenue',
+                                title="💰 Daily Revenue",
+                                labels={'Revenue': 'Revenue ($)', 'OrderDate': 'Date'},
+                                line_shape='spline',
+                                markers=True
+                            )
+                            fig.update_layout(
+                                plot_bgcolor='white',
+                                paper_bgcolor='white',
+                                title_font_size=16,
+                                title_font_color='#2E86AB'
+                            )
+                            fig.update_traces(line_color='#FF6B6B', line_width=3, marker_size=8)
+                            st.plotly_chart(fig, use_container_width=True)
 
 def show_export_options(data, active_filter, filter_value):
     """Show export options for the filtered data"""
