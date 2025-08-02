@@ -957,13 +957,29 @@ def data_relationships_page(data):
                     # Orders breakdown
                     if 'OrderID' in filtered_comprehensive.columns:
                         with st.expander("📦 Orders Information"):
-                            orders_summary = filtered_comprehensive[['OrderID', 'OrderDate', 'ShippedDate', 'ShipName', 'ShipCountry']].drop_duplicates()
+                            order_columns = ['OrderID']
+                            if 'OrderDate' in filtered_comprehensive.columns:
+                                order_columns.append('OrderDate')
+                            if 'ShippedDate' in filtered_comprehensive.columns:
+                                order_columns.append('ShippedDate')
+                            if 'ShipName' in filtered_comprehensive.columns:
+                                order_columns.append('ShipName')
+                            if 'ShipCountry' in filtered_comprehensive.columns:
+                                order_columns.append('ShipCountry')
+                            
+                            orders_summary = filtered_comprehensive[order_columns].drop_duplicates()
                             st.dataframe(orders_summary, use_container_width=True)
                     
                     # Products breakdown
                     if 'ProductName' in filtered_comprehensive.columns:
                         with st.expander("📦 Products Information"):
-                            products_summary = filtered_comprehensive[['ProductID', 'ProductName', 'CategoryName', 'UnitPrice']].drop_duplicates()
+                            product_columns = ['ProductID', 'ProductName']
+                            if 'CategoryName' in filtered_comprehensive.columns:
+                                product_columns.append('CategoryName')
+                            if 'UnitPrice' in filtered_comprehensive.columns:
+                                product_columns.append('UnitPrice')
+                            
+                            products_summary = filtered_comprehensive[product_columns].drop_duplicates()
                             st.dataframe(products_summary, use_container_width=True)
                     
                     # Customers breakdown
@@ -1166,51 +1182,61 @@ def show_comprehensive_charts(comprehensive_data, active_filter, filter_value):
     with col3:
         # Orders over time
         if 'OrderDate' in comprehensive_data.columns:
-            comprehensive_data['OrderDate'] = pd.to_datetime(comprehensive_data['OrderDate'], errors='coerce')
-            orders_by_date = comprehensive_data.groupby(comprehensive_data['OrderDate'].dt.date).size().reset_index(name='Orders')
-            orders_by_date['OrderDate'] = pd.to_datetime(orders_by_date['OrderDate']).dt.date
-            
-            fig = px.line(
-                orders_by_date,
-                x='OrderDate',
-                y='Orders',
-                title="📅 Orders Over Time",
-                labels={'Orders': 'Number of Orders', 'OrderDate': 'Date'},
-                line_shape='spline',
-                markers=True
-            )
-            fig.update_layout(
-                plot_bgcolor='white',
-                paper_bgcolor='white',
-                title_font_size=16,
-                title_font_color='#2E86AB'
-            )
-            fig.update_traces(line_color='#2E86AB', line_width=3, marker_size=8)
-            st.plotly_chart(fig, use_container_width=True)
+            try:
+                comprehensive_data['OrderDate'] = pd.to_datetime(comprehensive_data['OrderDate'], errors='coerce')
+                orders_by_date = comprehensive_data.groupby(comprehensive_data['OrderDate'].dt.date).size().reset_index(name='Orders')
+                orders_by_date['OrderDate'] = pd.to_datetime(orders_by_date['OrderDate']).dt.date
+                
+                fig = px.line(
+                    orders_by_date,
+                    x='OrderDate',
+                    y='Orders',
+                    title="📅 Orders Over Time",
+                    labels={'Orders': 'Number of Orders', 'OrderDate': 'Date'},
+                    line_shape='spline',
+                    markers=True
+                )
+                fig.update_layout(
+                    plot_bgcolor='white',
+                    paper_bgcolor='white',
+                    title_font_size=16,
+                    title_font_color='#2E86AB'
+                )
+                fig.update_traces(line_color='#2E86AB', line_width=3, marker_size=8)
+                st.plotly_chart(fig, use_container_width=True)
+            except Exception as e:
+                st.warning(f"Could not create orders over time chart: {str(e)}")
+        else:
+            st.info("OrderDate column not available for time series chart")
     
     with col4:
         # Revenue over time
         if 'OrderDate' in comprehensive_data.columns and 'Revenue' in comprehensive_data.columns:
-            revenue_by_date = comprehensive_data.groupby(comprehensive_data['OrderDate'].dt.date)['Revenue'].sum().reset_index()
-            revenue_by_date['OrderDate'] = pd.to_datetime(revenue_by_date['OrderDate']).dt.date
-            
-            fig = px.line(
-                revenue_by_date,
-                x='OrderDate',
-                y='Revenue',
-                title="💰 Revenue Over Time",
-                labels={'Revenue': 'Revenue ($)', 'OrderDate': 'Date'},
-                line_shape='spline',
-                markers=True
-            )
-            fig.update_layout(
-                plot_bgcolor='white',
-                paper_bgcolor='white',
-                title_font_size=16,
-                title_font_color='#2E86AB'
-            )
-            fig.update_traces(line_color='#FF6B6B', line_width=3, marker_size=8)
-            st.plotly_chart(fig, use_container_width=True)
+            try:
+                revenue_by_date = comprehensive_data.groupby(comprehensive_data['OrderDate'].dt.date)['Revenue'].sum().reset_index()
+                revenue_by_date['OrderDate'] = pd.to_datetime(revenue_by_date['OrderDate']).dt.date
+                
+                fig = px.line(
+                    revenue_by_date,
+                    x='OrderDate',
+                    y='Revenue',
+                    title="💰 Revenue Over Time",
+                    labels={'Revenue': 'Revenue ($)', 'OrderDate': 'Date'},
+                    line_shape='spline',
+                    markers=True
+                )
+                fig.update_layout(
+                    plot_bgcolor='white',
+                    paper_bgcolor='white',
+                    title_font_size=16,
+                    title_font_color='#2E86AB'
+                )
+                fig.update_traces(line_color='#FF6B6B', line_width=3, marker_size=8)
+                st.plotly_chart(fig, use_container_width=True)
+            except Exception as e:
+                st.warning(f"Could not create revenue over time chart: {str(e)}")
+        else:
+            st.info("OrderDate or Revenue columns not available for revenue chart")
 
 def show_comprehensive_export(comprehensive_data, active_filter, filter_value):
     """Show export options for comprehensive data"""
@@ -1295,16 +1321,9 @@ def create_comprehensive_dataset(data):
                 how='inner'
             )
         
-        # Select and rename columns to match your exact SQL query
-        columns_to_keep = [
-            'OrderID', 'ShippedDate', 'ShipName', 'ProductID', 'UnitPrice', 
-            'Quantity', 'Discount', 'CompanyName', 'CategoryName', 'ProductName', 
-            'CustomerID', 'EmployeeID', 'FirstName', 'LastName'
-        ]
-        
-        # Keep only columns that exist and rename CompanyName to CustomerCompany
-        available_columns = [col for col in columns_to_keep if col in comprehensive.columns]
-        comprehensive = comprehensive[available_columns]
+        # Keep all important columns from the joined dataset
+        # We'll keep all columns that exist in the comprehensive dataset
+        # This ensures we have all the data needed for charts and analytics
         
         # Rename CompanyName to CustomerCompany to match your query
         if 'CompanyName' in comprehensive.columns:
