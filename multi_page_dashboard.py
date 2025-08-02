@@ -26,23 +26,85 @@ st.markdown("""
         color: #1f77b4;
         text-align: center;
         margin-bottom: 2rem;
+        background: linear-gradient(90deg, #1f77b4, #ff7f0e);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
     }
     .metric-card {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 4px solid #1f77b4;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 1rem;
+        border: none;
         margin-bottom: 1rem;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease;
+    }
+    .metric-card:hover {
+        transform: translateY(-5px);
     }
     .chart-container {
-        background-color: white;
-        padding: 1rem;
+        background: white;
+        padding: 1.5rem;
+        border-radius: 1rem;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        margin-bottom: 1.5rem;
+        border: 1px solid #e0e0e0;
+    }
+    .data-table {
+        background: white;
         border-radius: 0.5rem;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin-bottom: 1rem;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        overflow: hidden;
     }
     .sidebar .sidebar-content {
-        background-color: #f8f9fa;
+        background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
+        border-right: 2px solid #dee2e6;
+    }
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background: #f8f9fa;
+        border-radius: 0.5rem;
+        padding: 0.5rem;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 0.5rem;
+        background: white;
+        border: 1px solid #dee2e6;
+        color: #495057;
+        font-weight: 500;
+    }
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+    }
+    .stExpander {
+        background: white;
+        border-radius: 0.5rem;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        border: 1px solid #e0e0e0;
+    }
+    .stDataFrame {
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+    .stSelectbox {
+        border-radius: 0.5rem;
+    }
+    .stButton > button {
+        border-radius: 0.5rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.2);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -939,7 +1001,11 @@ def data_relationships_page(data):
                     st.info(f"Showing all related data for {active_filter}: {display_name}")
                     
                     # Display comprehensive data table
-                    st.subheader("📊 Complete Data Table")
+                    st.markdown("""
+                    <div class="chart-container">
+                        <h3 style="color: #2E86AB; margin-bottom: 1rem;">📊 Complete Data Table</h3>
+                    </div>
+                    """, unsafe_allow_html=True)
                     st.dataframe(filtered_comprehensive, use_container_width=True)
                     
                     # Show data summary
@@ -952,11 +1018,16 @@ def data_relationships_page(data):
                         st.metric("Total Quantity", f"{filtered_comprehensive['Quantity'].sum():,}" if 'Quantity' in filtered_comprehensive.columns else "N/A")
                     
                     # Show detailed breakdowns
-                    st.subheader("📋 Data Breakdowns")
+                    st.markdown("""
+                    <div class="chart-container">
+                        <h3 style="color: #2E86AB; margin-bottom: 1rem;">📋 Data Breakdowns</h3>
+                        <p style="color: #666; font-size: 0.9rem;">Click on each section to view detailed information</p>
+                    </div>
+                    """, unsafe_allow_html=True)
                     
                     # Orders breakdown
                     if 'OrderID' in filtered_comprehensive.columns:
-                        with st.expander("📦 Orders Information"):
+                        with st.expander("📦 Orders Information", expanded=False):
                             order_columns = ['OrderID']
                             if 'OrderDate' in filtered_comprehensive.columns:
                                 order_columns.append('OrderDate')
@@ -972,7 +1043,7 @@ def data_relationships_page(data):
                     
                     # Products breakdown
                     if 'ProductName' in filtered_comprehensive.columns:
-                        with st.expander("📦 Products Information"):
+                        with st.expander("📦 Products Information", expanded=False):
                             product_columns = ['ProductID', 'ProductName']
                             if 'CategoryName' in filtered_comprehensive.columns:
                                 product_columns.append('CategoryName')
@@ -984,13 +1055,13 @@ def data_relationships_page(data):
                     
                     # Customers breakdown
                     if 'CustomerCompany' in filtered_comprehensive.columns:
-                        with st.expander("👤 Customers Information"):
+                        with st.expander("👤 Customers Information", expanded=False):
                             customers_summary = filtered_comprehensive[['CustomerID', 'CustomerCompany']].drop_duplicates()
                             st.dataframe(customers_summary, use_container_width=True)
                     
                     # Employees breakdown
                     if 'FirstName' in filtered_comprehensive.columns:
-                        with st.expander("👨‍💼 Employees Information"):
+                        with st.expander("👨‍💼 Employees Information", expanded=False):
                             employees_summary = filtered_comprehensive[['EmployeeID', 'FirstName', 'LastName']].drop_duplicates()
                             st.dataframe(employees_summary, use_container_width=True)
                 
@@ -1107,20 +1178,42 @@ def show_comprehensive_analytics(comprehensive_data, active_filter, filter_value
     with col1:
         if 'CategoryName' in comprehensive_data.columns:
             st.subheader("📦 Top Categories")
-            category_summary = comprehensive_data.groupby('CategoryName').agg({
-                'Quantity': 'sum',
-                'Revenue': 'sum'
-            }).sort_values('Revenue', ascending=False).head(10)
-            st.dataframe(category_summary, use_container_width=True)
+            try:
+                # Check if Revenue column exists, if not calculate it
+                if 'Revenue' not in comprehensive_data.columns:
+                    if 'UnitPrice' in comprehensive_data.columns and 'Quantity' in comprehensive_data.columns:
+                        comprehensive_data['Revenue'] = comprehensive_data['UnitPrice'] * comprehensive_data['Quantity']
+                    else:
+                        st.warning("Cannot calculate Revenue - missing UnitPrice or Quantity columns")
+                        return
+                
+                category_summary = comprehensive_data.groupby('CategoryName').agg({
+                    'Quantity': 'sum',
+                    'Revenue': 'sum'
+                }).sort_values('Revenue', ascending=False).head(10)
+                st.dataframe(category_summary, use_container_width=True)
+            except Exception as e:
+                st.warning(f"Could not create category summary: {str(e)}")
     
     with col2:
         if 'CustomerCompany' in comprehensive_data.columns:
             st.subheader("👤 Top Customers")
-            customer_summary = comprehensive_data.groupby('CustomerCompany').agg({
-                'Quantity': 'sum',
-                'Revenue': 'sum'
-            }).sort_values('Revenue', ascending=False).head(10)
-            st.dataframe(customer_summary, use_container_width=True)
+            try:
+                # Check if Revenue column exists, if not calculate it
+                if 'Revenue' not in comprehensive_data.columns:
+                    if 'UnitPrice' in comprehensive_data.columns and 'Quantity' in comprehensive_data.columns:
+                        comprehensive_data['Revenue'] = comprehensive_data['UnitPrice'] * comprehensive_data['Quantity']
+                    else:
+                        st.warning("Cannot calculate Revenue - missing UnitPrice or Quantity columns")
+                        return
+                
+                customer_summary = comprehensive_data.groupby('CustomerCompany').agg({
+                    'Quantity': 'sum',
+                    'Revenue': 'sum'
+                }).sort_values('Revenue', ascending=False).head(10)
+                st.dataframe(customer_summary, use_container_width=True)
+            except Exception as e:
+                st.warning(f"Could not create customer summary: {str(e)}")
 
 def show_comprehensive_charts(comprehensive_data, active_filter, filter_value):
     """Show comprehensive charts for the filtered data"""
@@ -1137,24 +1230,35 @@ def show_comprehensive_charts(comprehensive_data, active_filter, filter_value):
     
     with col1:
         # Revenue by category
-        if 'CategoryName' in comprehensive_data.columns and 'Revenue' in comprehensive_data.columns:
-            category_revenue = comprehensive_data.groupby('CategoryName')['Revenue'].sum().sort_values(ascending=False)
-            fig = px.bar(
-                x=category_revenue.index,
-                y=category_revenue.values,
-                title="💰 Revenue by Category",
-                labels={'x': 'Category', 'y': 'Revenue ($)'},
-                color=category_revenue.values,
-                color_continuous_scale='Greens'
-            )
-            fig.update_layout(
-                plot_bgcolor='white',
-                paper_bgcolor='white',
-                title_font_size=16,
-                title_font_color='#2E86AB',
-                xaxis_tickangle=-45
-            )
-            st.plotly_chart(fig, use_container_width=True)
+        if 'CategoryName' in comprehensive_data.columns:
+            try:
+                # Check if Revenue column exists, if not calculate it
+                if 'Revenue' not in comprehensive_data.columns:
+                    if 'UnitPrice' in comprehensive_data.columns and 'Quantity' in comprehensive_data.columns:
+                        comprehensive_data['Revenue'] = comprehensive_data['UnitPrice'] * comprehensive_data['Quantity']
+                    else:
+                        st.info("Cannot create revenue chart - missing UnitPrice or Quantity columns")
+                        return
+                
+                category_revenue = comprehensive_data.groupby('CategoryName')['Revenue'].sum().sort_values(ascending=False)
+                fig = px.bar(
+                    x=category_revenue.index,
+                    y=category_revenue.values,
+                    title="💰 Revenue by Category",
+                    labels={'x': 'Category', 'y': 'Revenue ($)'},
+                    color=category_revenue.values,
+                    color_continuous_scale='Greens'
+                )
+                fig.update_layout(
+                    plot_bgcolor='white',
+                    paper_bgcolor='white',
+                    title_font_size=16,
+                    title_font_color='#2E86AB',
+                    xaxis_tickangle=-45
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            except Exception as e:
+                st.warning(f"Could not create revenue chart: {str(e)}")
     
     with col2:
         # Quantity by product
@@ -1211,8 +1315,16 @@ def show_comprehensive_charts(comprehensive_data, active_filter, filter_value):
     
     with col4:
         # Revenue over time
-        if 'OrderDate' in comprehensive_data.columns and 'Revenue' in comprehensive_data.columns:
+        if 'OrderDate' in comprehensive_data.columns:
             try:
+                # Check if Revenue column exists, if not calculate it
+                if 'Revenue' not in comprehensive_data.columns:
+                    if 'UnitPrice' in comprehensive_data.columns and 'Quantity' in comprehensive_data.columns:
+                        comprehensive_data['Revenue'] = comprehensive_data['UnitPrice'] * comprehensive_data['Quantity']
+                    else:
+                        st.info("Cannot create revenue chart - missing UnitPrice or Quantity columns")
+                        return
+                
                 revenue_by_date = comprehensive_data.groupby(comprehensive_data['OrderDate'].dt.date)['Revenue'].sum().reset_index()
                 revenue_by_date['OrderDate'] = pd.to_datetime(revenue_by_date['OrderDate']).dt.date
                 
@@ -1236,7 +1348,7 @@ def show_comprehensive_charts(comprehensive_data, active_filter, filter_value):
             except Exception as e:
                 st.warning(f"Could not create revenue over time chart: {str(e)}")
         else:
-            st.info("OrderDate or Revenue columns not available for revenue chart")
+            st.info("OrderDate column not available for revenue chart")
 
 def show_comprehensive_export(comprehensive_data, active_filter, filter_value):
     """Show export options for comprehensive data"""
